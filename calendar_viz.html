@@ -10,8 +10,9 @@
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:'Segoe UI',Tahoma,sans-serif;color:var(--ink);background:#fff;display:flex;overflow:hidden}
-  #stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0;padding:8px}
-  svg{width:100%;height:100%}
+  #stage{flex:1;position:relative;display:flex;min-height:0}
+  #scroll{flex:1;overflow:auto;padding:12px;min-width:0}
+  svg{display:block}
   #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:#fff}
   .msg{text-align:center;color:var(--muted);font:400 13px 'Segoe UI';max-width:300px;line-height:1.55}
   .msg b{color:var(--ink);display:block;margin-bottom:6px;font:600 14px 'Segoe UI'}
@@ -52,7 +53,7 @@
 </head>
 <body>
   <div id="stage">
-    <svg id="cal" preserveAspectRatio="xMidYMid meet" class="hide"></svg>
+    <div id="scroll"><svg id="cal" class="hide"></svg></div>
     <div id="msg"><div class="msg" id="msgText"><b>Loading…</b>Starting the calendar.</div></div>
     <button id="gear" title="Settings">&#9881;</button>
   </div>
@@ -61,7 +62,7 @@
     <div class="phead"><h3>Calendar settings</h3><button class="x" id="pClose">&times;</button></div>
     <div class="pbody">
       <div class="grp"><h4>Cells</h4>
-        <div class="row col"><span>Cell size <span class="muted" id="clCellSizeV"></span></span><input type="range" id="clCellSize" min="6" max="22" step="1"></div>
+        <div class="row col"><span>Cell size (height) <span class="muted" id="clCellSizeV"></span></span><input type="range" id="clCellSize" min="6" max="34" step="1"></div>
         <div class="row col"><span>Gap <span class="muted" id="clCellGapV"></span></span><input type="range" id="clCellGap" min="0" max="6" step="1"></div>
         <div class="row col"><span>Corner radius <span class="muted" id="clCellRadiusV"></span></span><input type="range" id="clCellRadius" min="0" max="11" step="1"></div>
       </div>
@@ -70,9 +71,11 @@
         <label class="row">High <input type="color" id="clHigh"></label>
         <label class="row">Empty / no data <input type="color" id="clEmpty"></label>
       </div>
-      <div class="grp"><h4>Scale</h4>
-        <label class="row">Mode <select id="clScaleMode"><option value="auto">Auto (max in view)</option><option value="fixed">Fixed</option></select></label>
+      <div class="grp"><h4>Colour scale</h4>
+        <label class="row">Mode <select id="clScaleMode"><option value="auto">Auto (0 → max in view)</option><option value="fixed">Fixed range</option></select></label>
+        <label class="row">Min <input type="number" id="clScaleMin" min="0" step="1"></label>
         <label class="row">Max <input type="number" id="clScaleMax" min="1" step="1"></label>
+        <div class="row"><span class="muted">Fixed range tames outliers: days at/above Max all read darkest, so the ramp spreads across the range you set.</span></div>
       </div>
       <div class="grp"><h4>Layout</h4>
         <label class="row">Week starts <select id="clWeekStart"><option value="mon">Monday</option><option value="sun">Sunday</option></select></label>
@@ -111,7 +114,7 @@
   const DEFAULTS = {
     cellSize:13, cellGap:3, cellRadius:3,
     lowColor:'#cfe0f1', highColor:'#1d4675', emptyColor:'#e9edf2',
-    scaleMode:'auto', scaleMax:100,
+    scaleMode:'auto', scaleMin:0, scaleMax:100,
     weekStart:'mon', monthLabels:true, weekdayLabels:true, showEmpty:true, emptyStyle:'solid',
     fontFamily:"'Segoe UI', Tahoma, sans-serif", labelSize:10, labelColor:'#8a95a0'
   };
@@ -202,8 +205,10 @@
     const cell=+cfg.cellSize, gap=+cfg.cellGap, step=cell+gap;
     const leftM=cfg.weekdayLabels?30:4, topM=cfg.monthLabels?16:4;
 
-    let g='', maxV = cfg.scaleMode==='fixed' ? Math.max(+cfg.scaleMax||1,1) : 1;
-    if(cfg.scaleMode!=='fixed') map.forEach(v=>{ if(v>maxV) maxV=v; });
+    let dataMax=1; map.forEach(v=>{ if(v>dataMax) dataMax=v; });
+    const lo = cfg.scaleMode==='fixed' ? (+cfg.scaleMin||0) : 0;
+    const hi = cfg.scaleMode==='fixed' ? Math.max(+cfg.scaleMax||1, lo+1) : dataMax;
+    let g='';
 
     const colFirst=[]; let nCols=0;
     const cur=new Date(start);
@@ -219,7 +224,7 @@
           else g+=`<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="${cfg.cellRadius}" fill="${cfg.emptyColor}"/>`;
         }
       } else {
-        const t=Math.max(0,Math.min(1, v/maxV));
+        const t=Math.max(0,Math.min(1, (v-lo)/(hi-lo)));
         g+=`<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="${cfg.cellRadius}" fill="${mix(cfg.lowColor,cfg.highColor,t)}" data-d="${fmtDate(cur)}" data-v="${round(v)}"/>`;
       }
       cur.setDate(cur.getDate()+1);
@@ -232,12 +237,12 @@
     }
     // weekday labels
     if(cfg.weekdayLabels){
-      const wd = cfg.weekStart==='mon' ? ['Mon','','Wed','','Fri','',''] : ['','Mon','','Wed','','Fri',''];
-      wd.forEach((t,r)=>{ if(!t)return; g+=`<text x="${leftM-6}" y="${topM+r*step+cell-2}" text-anchor="end" fill="${cfg.labelColor}" font-family="${cfg.fontFamily}" font-size="${cfg.labelSize}">${t}</text>`; });
+      const wd = cfg.weekStart==='mon' ? ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      wd.forEach((t,r)=>{ g+=`<text x="${leftM-6}" y="${topM+r*step+cell-2}" text-anchor="end" fill="${cfg.labelColor}" font-family="${cfg.fontFamily}" font-size="${cfg.labelSize}">${t}</text>`; });
     }
 
     const W=leftM+(nCols+1)*step+2, H=topM+7*step+2;
-    const svg=$('cal'); svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.innerHTML=g;
+    const svg=$('cal'); svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('width',W); svg.setAttribute('height',H); svg.innerHTML=g;
     svg.classList.remove('hide'); $('msg').classList.add('hide');
   }
   function redraw(){ if(lastRows) drawCal(lastRows); }
@@ -248,6 +253,7 @@
     RANGES.forEach(([id,k,suf])=> $(id).addEventListener('input', e=>{ cfg[k]=+e.target.value; const v=$(id+'V'); if(v)v.textContent=e.target.value+suf; saveCfg(); redraw(); }));
     COLORS.forEach(([id,k])=> $(id).addEventListener('input', e=>{ cfg[k]=e.target.value; saveCfg(); redraw(); }));
     SELECTS.forEach(([id,k])=> $(id).addEventListener('change', e=>{ cfg[k]=e.target.value; saveCfg(); redraw(); }));
+    $('clScaleMin').addEventListener('input', e=>{ cfg.scaleMin=+e.target.value; if(cfg.scaleMode==='fixed'){ saveCfg(); redraw(); } });
     $('clScaleMax').addEventListener('input', e=>{ cfg.scaleMax=+e.target.value; if(cfg.scaleMode==='fixed'){ saveCfg(); redraw(); } });
   }
   function syncControls(){
@@ -255,7 +261,7 @@
     RANGES.forEach(([id,k,suf])=>{ $(id).value=cfg[k]; const v=$(id+'V'); if(v)v.textContent=cfg[k]+suf; });
     COLORS.forEach(([id,k])=> $(id).value=cfg[k]);
     SELECTS.forEach(([id,k])=> $(id).value=cfg[k]);
-    $('clScaleMax').value=cfg.scaleMax;
+    $('clScaleMin').value=cfg.scaleMin; $('clScaleMax').value=cfg.scaleMax;
   }
 
   /* ---------- tooltip ---------- */
