@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activity Calendar (Viz)</title>
+<script src="tableau.extensions.1.latest.min.js"></script>
+<style>
+  :root{ --blue:#4E79A7; --blue-deep:#3B5E84; --ink:#2b2b2b; --muted:#7a7a7a; --line:#e6e6e6; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Segoe UI',Tahoma,sans-serif;color:var(--ink);background:#fff;display:flex;overflow:hidden}
+  #stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0;padding:8px}
+  svg{width:100%;height:100%}
+  #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:#fff}
+  .msg{text-align:center;color:var(--muted);font:400 13px 'Segoe UI';max-width:300px;line-height:1.55}
+  .msg b{color:var(--ink);display:block;margin-bottom:6px;font:600 14px 'Segoe UI'}
+  .msg .enc{color:var(--blue-deep);font-weight:600}
+  .hide{display:none!important}
+
+  #gear{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:7px;border:1px solid var(--line);
+        background:#fff;color:#888;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:15px;z-index:6}
+  #gear:hover{color:var(--blue);border-color:var(--blue)}
+
+  #panel{position:absolute;top:0;right:0;height:100%;width:258px;background:#fff;border-left:1px solid var(--line);
+         box-shadow:-12px 0 30px -18px rgba(0,0,0,.3);z-index:7;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+  #panel.open{transform:none}
+  .phead{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .phead h3{font:700 13px 'Segoe UI'}
+  .phead .x{cursor:pointer;color:#999;font-size:18px;border:0;background:none}
+  .pbody{overflow-y:auto;padding:4px 14px 18px}
+  .grp{margin-top:13px}
+  .grp h4{font:700 9.5px 'Segoe UI';letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;padding-bottom:4px;border-bottom:1px dashed var(--line)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;font:500 12.5px 'Segoe UI';color:#333}
+  .row.col{flex-direction:column;align-items:stretch;gap:4px}
+  .row input[type=range]{width:128px}
+  .row input[type=number]{width:60px;font:500 12px 'Segoe UI';padding:4px 6px;border:1px solid #cfcfcf;border-radius:5px}
+  .row input[type=color]{width:30px;height:22px;border:1px solid #cfcfcf;border-radius:5px;padding:0;background:#fff;cursor:pointer}
+  .row select{max-width:140px;font:500 12px 'Segoe UI';padding:4px 6px;border:1px solid #cfcfcf;border-radius:5px;background:#fff;cursor:pointer}
+  .sw{position:relative;width:34px;height:19px;flex:0 0 auto;cursor:pointer}
+  .sw input{display:none}
+  .sw i{position:absolute;inset:0;background:#d2d2d2;border-radius:999px;transition:background .16s}
+  .sw i::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .16s}
+  .sw input:checked + i{background:var(--blue)}
+  .sw input:checked + i::after{transform:translateX(15px)}
+  .muted{color:var(--muted);font-size:11px;font-weight:400}
+
+  #tip{position:fixed;pointer-events:none;z-index:20;background:#11243A;color:#fff;border-radius:8px;padding:7px 10px;font:500 12px 'Segoe UI';box-shadow:0 10px 30px -8px rgba(0,0,0,.5);opacity:0;transition:opacity .1s;max-width:220px}
+  #tip .d{font-weight:600;margin-bottom:2px}
+  #tip .m{font:600 11px 'Consolas',monospace;color:#cfe0f1}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <svg id="cal" preserveAspectRatio="xMidYMid meet" class="hide"></svg>
+    <div id="msg"><div class="msg" id="msgText"><b>Loading…</b>Starting the calendar.</div></div>
+    <button id="gear" title="Settings">&#9881;</button>
+  </div>
+
+  <div id="panel">
+    <div class="phead"><h3>Calendar settings</h3><button class="x" id="pClose">&times;</button></div>
+    <div class="pbody">
+      <div class="grp"><h4>Cells</h4>
+        <div class="row col"><span>Cell size <span class="muted" id="clCellSizeV"></span></span><input type="range" id="clCellSize" min="6" max="22" step="1"></div>
+        <div class="row col"><span>Gap <span class="muted" id="clCellGapV"></span></span><input type="range" id="clCellGap" min="0" max="6" step="1"></div>
+        <div class="row col"><span>Corner radius <span class="muted" id="clCellRadiusV"></span></span><input type="range" id="clCellRadius" min="0" max="11" step="1"></div>
+      </div>
+      <div class="grp"><h4>Colours</h4>
+        <label class="row">Low <input type="color" id="clLow"></label>
+        <label class="row">High <input type="color" id="clHigh"></label>
+        <label class="row">Empty / no data <input type="color" id="clEmpty"></label>
+      </div>
+      <div class="grp"><h4>Scale</h4>
+        <label class="row">Mode <select id="clScaleMode"><option value="auto">Auto (max in view)</option><option value="fixed">Fixed</option></select></label>
+        <label class="row">Max <input type="number" id="clScaleMax" min="1" step="1"></label>
+      </div>
+      <div class="grp"><h4>Layout</h4>
+        <label class="row">Week starts <select id="clWeekStart"><option value="mon">Monday</option><option value="sun">Sunday</option></select></label>
+        <label class="row">Month labels <span class="sw"><input type="checkbox" id="clMonthLabels"><i></i></span></label>
+        <label class="row">Weekday labels <span class="sw"><input type="checkbox" id="clWeekdayLabels"><i></i></span></label>
+        <label class="row">Show empty days <span class="sw"><input type="checkbox" id="clShowEmpty"><i></i></span></label>
+        <label class="row">Empty style <select id="clEmptyStyle"><option value="solid">Solid</option><option value="dashed">Dashed</option></select></label>
+      </div>
+      <div class="grp"><h4>Typography</h4>
+        <label class="row">Font <select id="clFont">
+          <option value="'Segoe UI', Tahoma, sans-serif">Segoe UI</option>
+          <option value="'Benton Sans','Segoe UI',sans-serif">Benton Sans</option>
+          <option value="Arial, Helvetica, sans-serif">Arial</option>
+          <option value="Tahoma, Geneva, sans-serif">Tahoma</option>
+          <option value="Verdana, Geneva, sans-serif">Verdana</option>
+          <option value="Georgia, serif">Georgia</option></select></label>
+        <div class="row col"><span>Label size <span class="muted" id="clLabelSizeV"></span></span><input type="range" id="clLabelSize" min="7" max="15" step="1"></div>
+        <label class="row">Label colour <input type="color" id="clLabelColor"></label>
+      </div>
+    </div>
+  </div>
+<div id="tip"></div>
+
+<script>
+"use strict";
+(function(){
+  const $ = id => document.getElementById(id);
+  let worksheet = null, lastRows = null;
+  const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const TOGGLES = [['clMonthLabels','monthLabels'],['clWeekdayLabels','weekdayLabels'],['clShowEmpty','showEmpty']];
+  const RANGES  = [['clCellSize','cellSize','px'],['clCellGap','cellGap','px'],['clCellRadius','cellRadius','px'],['clLabelSize','labelSize','px']];
+  const COLORS  = [['clLow','lowColor'],['clHigh','highColor'],['clEmpty','emptyColor'],['clLabelColor','labelColor']];
+  const SELECTS = [['clScaleMode','scaleMode'],['clWeekStart','weekStart'],['clEmptyStyle','emptyStyle'],['clFont','fontFamily']];
+
+  const DEFAULTS = {
+    cellSize:13, cellGap:3, cellRadius:3,
+    lowColor:'#cfe0f1', highColor:'#1d4675', emptyColor:'#e9edf2',
+    scaleMode:'auto', scaleMax:100,
+    weekStart:'mon', monthLabels:true, weekdayLabels:true, showEmpty:true, emptyStyle:'solid',
+    fontFamily:"'Segoe UI', Tahoma, sans-serif", labelSize:10, labelColor:'#8a95a0'
+  };
+  let cfg = JSON.parse(JSON.stringify(DEFAULTS));
+
+  function loadCfg(){ try{ const r=tableau.extensions.settings.get('calCfg'); if(r) cfg={...JSON.parse(JSON.stringify(DEFAULTS)),...JSON.parse(r)}; }catch(_){} }
+  let saveT=null;
+  function saveCfg(){ try{ tableau.extensions.settings.set('calCfg', JSON.stringify(cfg));
+    clearTimeout(saveT); saveT=setTimeout(()=>{ try{ tableau.extensions.settings.saveAsync(); }catch(_){} }, 300); }catch(_){} }
+
+  /* ---------- boot ---------- */
+  $('gear').onclick=()=>$('panel').classList.add('open');
+  $('pClose').onclick=()=>$('panel').classList.remove('open');
+  bindControls();
+  tableau.extensions.initializeAsync().then(() => {
+    worksheet = tableau.extensions.worksheetContent.worksheet;
+    loadCfg(); syncControls();
+    worksheet.addEventListener(tableau.TableauEventType.SummaryDataChanged, render);
+    $('gear').style.display='flex';
+    render();
+  }).catch(e => showMsg('Couldn’t start', esc(String(e && e.message || e))));
+
+  /* ---------- render ---------- */
+  async function render(){
+    if(!worksheet) return;
+    try{
+      const spec  = await worksheet.getVisualSpecificationAsync();
+      const marks = spec.marksSpecifications[spec.activeMarksSpecificationIndex];
+      let dateName=null, valName=null;
+      (marks.encodings || []).forEach(enc => {
+        const f = enc.field || (enc.fields && enc.fields[0]); if(!f) return;
+        if(enc.id==='date')  dateName = f.name;
+        if(enc.id==='value') valName  = f.name;
+      });
+      if(!dateName || !valName)
+        return showMsg('Drop your fields','Put a day-level date on <span class="enc">Date</span> and a measure on <span class="enc">Colour</span> (e.g. SUM(weighted_units)).');
+
+      const dt = await fetchTable(worksheet);
+      let di = dt.columns.findIndex(c => c.fieldName === dateName);
+      let vi = dt.columns.findIndex(c => c.fieldName === valName);
+      if(di < 0) di = dt.columns.findIndex(c => c.dataType==='date' || c.dataType==='date-time');
+      if(vi < 0) vi = dt.columns.findIndex(c => c.dataType==='float' || c.dataType==='int');
+      if(di < 0 || vi < 0) return showMsg('Couldn’t read fields','Date must be a date and Colour a number.');
+
+      const rows=[];
+      dt.data.forEach(r => {
+        const d = toDate(r[di]); if(!d) return;
+        const raw = r[vi].value;
+        const num = typeof raw==='number' ? raw : parseFloat(r[vi].formattedValue);
+        rows.push({ date:d, value:isNaN(num)?0:num });
+      });
+      if(!rows.length) return showMsg('No dated rows','Make sure the Date field is at day level (exact date) and the view has data.');
+      drawCal(rows);
+    }catch(e){ showMsg('Error', esc(String(e && e.message || e))); }
+  }
+
+  async function fetchTable(ws){
+    if(ws.getSummaryDataReaderAsync){
+      const reader = await ws.getSummaryDataReaderAsync(undefined, { ignoreSelection:true });
+      const dt = await reader.getAllPagesAsync(); await reader.releaseAsync(); return dt;
+    }
+    return await ws.getSummaryDataAsync({ maxRows:100000, ignoreSelection:true });
+  }
+
+  function toDate(cell){
+    const v=cell.value;
+    if(v instanceof Date && !isNaN(v)) return v;
+    let d=new Date(v); if(!isNaN(d)) return d;
+    d=new Date(cell.formattedValue); if(!isNaN(d)) return d;
+    return null;
+  }
+
+  /* ---------- colour ---------- */
+  function hx(h){ h=(h||'#000').replace('#',''); if(h.length===3)h=h.split('').map(c=>c+c).join(''); const n=parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+  function mix(c1,c2,t){ const A=hx(c1),B=hx(c2),L=(a,b)=>Math.round(a+(b-a)*t); return `rgb(${L(A[0],B[0])},${L(A[1],B[1])},${L(A[2],B[2])})`; }
+
+  /* ---------- draw ---------- */
+  function drawCal(rows){
+    lastRows = rows;
+    const key=d=>`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const map=new Map(); let minD=null,maxD=null;
+    rows.forEach(r=>{ const k=key(r.date); map.set(k,(map.get(k)||0)+r.value);
+      if(!minD||r.date<minD)minD=r.date; if(!maxD||r.date>maxD)maxD=r.date; });
+
+    const start=new Date(minD.getFullYear(),0,1), end=new Date(maxD.getFullYear(),11,31);
+    const rowOf=d=> cfg.weekStart==='mon' ? (d.getDay()+6)%7 : d.getDay();
+    const startRow=rowOf(start);
+    const cell=+cfg.cellSize, gap=+cfg.cellGap, step=cell+gap;
+    const leftM=cfg.weekdayLabels?30:4, topM=cfg.monthLabels?16:4;
+
+    let g='', maxV = cfg.scaleMode==='fixed' ? Math.max(+cfg.scaleMax||1,1) : 1;
+    if(cfg.scaleMode!=='fixed') map.forEach(v=>{ if(v>maxV) maxV=v; });
+
+    const colFirst=[]; let nCols=0;
+    const cur=new Date(start);
+    for(let di=0; cur<=end; di++){
+      const col=Math.floor((di+startRow)/7), row=rowOf(cur);
+      if(col>nCols) nCols=col;
+      if(colFirst[col]===undefined) colFirst[col]=new Date(cur);
+      const v=map.get(key(cur));
+      const x=leftM+col*step, y=topM+row*step;
+      if(v===undefined){
+        if(cfg.showEmpty){
+          if(cfg.emptyStyle==='dashed') g+=`<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="${cfg.cellRadius}" fill="none" stroke="${cfg.emptyColor}" stroke-width="1" stroke-dasharray="2 2"/>`;
+          else g+=`<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="${cfg.cellRadius}" fill="${cfg.emptyColor}"/>`;
+        }
+      } else {
+        const t=Math.max(0,Math.min(1, v/maxV));
+        g+=`<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="${cfg.cellRadius}" fill="${mix(cfg.lowColor,cfg.highColor,t)}" data-d="${fmtDate(cur)}" data-v="${round(v)}"/>`;
+      }
+      cur.setDate(cur.getDate()+1);
+    }
+
+    // month labels
+    if(cfg.monthLabels){ let lm=-1;
+      colFirst.forEach((d,col)=>{ if(!d)return; const m=d.getMonth(); if(m!==lm){ lm=m;
+        g+=`<text x="${leftM+col*step}" y="${topM-5}" fill="${cfg.labelColor}" font-family="${cfg.fontFamily}" font-size="${cfg.labelSize}">${MON[m]}</text>`; } });
+    }
+    // weekday labels
+    if(cfg.weekdayLabels){
+      const wd = cfg.weekStart==='mon' ? ['Mon','','Wed','','Fri','',''] : ['','Mon','','Wed','','Fri',''];
+      wd.forEach((t,r)=>{ if(!t)return; g+=`<text x="${leftM-6}" y="${topM+r*step+cell-2}" text-anchor="end" fill="${cfg.labelColor}" font-family="${cfg.fontFamily}" font-size="${cfg.labelSize}">${t}</text>`; });
+    }
+
+    const W=leftM+(nCols+1)*step+2, H=topM+7*step+2;
+    const svg=$('cal'); svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.innerHTML=g;
+    svg.classList.remove('hide'); $('msg').classList.add('hide');
+  }
+  function redraw(){ if(lastRows) drawCal(lastRows); }
+
+  /* ---------- controls ---------- */
+  function bindControls(){
+    TOGGLES.forEach(([id,k])=> $(id).addEventListener('change', e=>{ cfg[k]=e.target.checked; saveCfg(); redraw(); }));
+    RANGES.forEach(([id,k,suf])=> $(id).addEventListener('input', e=>{ cfg[k]=+e.target.value; const v=$(id+'V'); if(v)v.textContent=e.target.value+suf; saveCfg(); redraw(); }));
+    COLORS.forEach(([id,k])=> $(id).addEventListener('input', e=>{ cfg[k]=e.target.value; saveCfg(); redraw(); }));
+    SELECTS.forEach(([id,k])=> $(id).addEventListener('change', e=>{ cfg[k]=e.target.value; saveCfg(); redraw(); }));
+    $('clScaleMax').addEventListener('input', e=>{ cfg.scaleMax=+e.target.value; if(cfg.scaleMode==='fixed'){ saveCfg(); redraw(); } });
+  }
+  function syncControls(){
+    TOGGLES.forEach(([id,k])=> $(id).checked=cfg[k]);
+    RANGES.forEach(([id,k,suf])=>{ $(id).value=cfg[k]; const v=$(id+'V'); if(v)v.textContent=cfg[k]+suf; });
+    COLORS.forEach(([id,k])=> $(id).value=cfg[k]);
+    SELECTS.forEach(([id,k])=> $(id).value=cfg[k]);
+    $('clScaleMax').value=cfg.scaleMax;
+  }
+
+  /* ---------- tooltip ---------- */
+  const tip=$('tip');
+  $('cal').addEventListener('mouseover',e=>{ const c=e.target.closest('rect'); if(!c||!c.dataset.d){tip.style.opacity=0;return;}
+    tip.innerHTML=`<div class="d">${esc(c.dataset.d)}</div><div class="m">${esc(c.dataset.v)}</div>`; tip.style.opacity=1; });
+  $('cal').addEventListener('mousemove',e=>{ if(tip.style.opacity==='1'){ tip.style.left=Math.min(e.clientX+14,innerWidth-230)+'px'; tip.style.top=(e.clientY+16)+'px'; } });
+  $('cal').addEventListener('mouseout',e=>{ if(e.target.closest('rect')) tip.style.opacity=0; });
+
+  /* ---------- utils ---------- */
+  function showMsg(t,b){ $('cal').classList.add('hide'); $('msg').classList.remove('hide'); $('msgText').innerHTML='<b>'+esc(t)+'</b>'+(b||''); }
+  function fmtDate(d){ return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }
+  const round = v => Math.round(v);
+  const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+})();
+</script>
+</body>
+</html>
