@@ -4,39 +4,103 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Performance Radar (Viz)</title>
-<!-- Library is hosted alongside this file (same origin). Upload tableau.extensions.1.latest.min.js next to radar_viz.html. -->
+<!-- Library hosted alongside this file (same origin). Upload tableau.extensions.1.latest.min.js next to radar_viz.html. -->
 <script src="tableau.extensions.1.latest.min.js"></script>
 <style>
   :root{
-    --blue:#4E79A7; --blue-deep:#3B5E84; --blue-fill:rgba(78,121,167,.20);
-    --grid:#E4E4E4; --axis:#C7C7C7; --ink:#2b2b2b; --muted:#7a7a7a;
+    --blue:#4E79A7; --blue-deep:#3B5E84; --grid:#E4E4E4; --axis:#C7C7C7;
+    --ink:#2b2b2b; --muted:#7a7a7a; --line:#e6e6e6; --panel:#ffffff;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
-  body{font-family:'Benton Sans','Segoe UI',Tahoma,sans-serif;color:var(--ink);background:#fff;
-       display:flex;overflow:hidden}
+  body{font-family:'Benton Sans','Segoe UI',Tahoma,sans-serif;color:var(--ink);background:#fff;display:flex;overflow:hidden}
   #stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0}
   svg{width:100%;height:100%}
   .ring{fill:none;stroke:var(--grid);stroke-width:1}
   .ring.out{stroke:var(--axis)}
   .spoke{stroke:var(--grid);stroke-width:1}
-  .axis-label{font:600 12px 'Segoe UI',sans-serif;fill:var(--ink)}
-  .axis-val{font:600 11px 'Segoe UI',sans-serif;fill:var(--blue-deep)}
+  .axis-label{font:600 12px 'Segoe UI',sans-serif}
+  .axis-val{font:600 11px 'Segoe UI',sans-serif}
   .ring-num{font:500 9px 'Segoe UI',sans-serif;fill:#b6b6b6}
-  .poly{fill:var(--blue-fill);stroke:var(--blue);stroke-width:2;stroke-linejoin:round;
-        transition:all .45s cubic-bezier(.4,0,.2,1)}
-  .vtx{fill:#fff;stroke:var(--blue);stroke-width:2;transition:all .45s cubic-bezier(.4,0,.2,1)}
+  .title{font:700 14px 'Segoe UI',sans-serif;fill:var(--ink)}
   #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:#fff}
   .msg{text-align:center;color:var(--muted);font:400 13px 'Segoe UI';max-width:280px;line-height:1.55}
   .msg b{color:var(--ink);display:block;margin-bottom:6px;font:600 14px 'Segoe UI'}
   .msg .enc{color:var(--blue-deep);font-weight:600}
   .hide{display:none!important}
+
+  /* gear */
+  #gear{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:7px;border:1px solid var(--line);
+        background:#fff;color:#888;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:15px;z-index:6}
+  #gear:hover{color:var(--blue);border-color:var(--blue)}
+
+  /* settings panel */
+  #panel{position:absolute;top:0;right:0;height:100%;width:248px;background:var(--panel);border-left:1px solid var(--line);
+         box-shadow:-12px 0 30px -18px rgba(0,0,0,.3);z-index:7;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);
+         display:flex;flex-direction:column}
+  #panel.open{transform:none}
+  .phead{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .phead h3{font:700 13px 'Segoe UI';letter-spacing:.02em}
+  .phead .x{cursor:pointer;color:#999;font-size:18px;line-height:1;border:0;background:none}
+  .phead .x:hover{color:var(--ink)}
+  .pbody{overflow-y:auto;padding:6px 14px 16px}
+  .grp{margin-top:12px}
+  .grp h4{font:700 9.5px 'Segoe UI';letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;padding-bottom:4px;border-bottom:1px dashed var(--line)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;font:500 12.5px 'Segoe UI';color:#333}
+  .row.col{flex-direction:column;align-items:stretch;gap:5px}
+  .row input[type=range]{width:118px}
+  .row input[type=number]{width:62px;font:500 12px 'Segoe UI';padding:4px 6px;border:1px solid #cfcfcf;border-radius:5px}
+  .row input[type=text]{width:100%;font:500 12px 'Segoe UI';padding:5px 7px;border:1px solid #cfcfcf;border-radius:5px}
+  .row input[type=color]{width:30px;height:22px;border:1px solid #cfcfcf;border-radius:5px;padding:0;background:#fff;cursor:pointer}
+  .row select{font:500 12px 'Segoe UI';padding:4px 6px;border:1px solid #cfcfcf;border-radius:5px;background:#fff;cursor:pointer}
+  /* switch */
+  .sw{position:relative;width:34px;height:19px;flex:0 0 auto;cursor:pointer}
+  .sw input{display:none}
+  .sw i{position:absolute;inset:0;background:#d2d2d2;border-radius:999px;transition:background .16s}
+  .sw i::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .16s}
+  .sw input:checked + i{background:var(--blue)}
+  .sw input:checked + i::after{transform:translateX(15px)}
+  .muted{color:var(--muted);font-size:11px}
 </style>
 </head>
 <body>
   <div id="stage">
     <svg id="radar" viewBox="0 0 440 400" preserveAspectRatio="xMidYMid meet" class="hide"></svg>
     <div id="msg"><div class="msg" id="msgText"><b>Loading…</b>Starting the radar.</div></div>
+    <button id="gear" title="Settings">&#9881;</button>
+
+    <div id="panel">
+      <div class="phead"><h3>Radar settings</h3><button class="x" id="pClose">&times;</button></div>
+      <div class="pbody">
+
+        <div class="grp"><h4>Show / hide</h4>
+          <label class="row">Gridlines <span class="sw"><input type="checkbox" id="cGrid"><i></i></span></label>
+          <label class="row">Scale numbers <span class="sw"><input type="checkbox" id="cRingNums"><i></i></span></label>
+          <label class="row">Axis names <span class="sw"><input type="checkbox" id="cAxisNames"><i></i></span></label>
+          <label class="row">Value labels <span class="sw"><input type="checkbox" id="cValues"><i></i></span></label>
+          <label class="row">Corner dots <span class="sw"><input type="checkbox" id="cDots"><i></i></span></label>
+          <label class="row">Filled area <span class="sw"><input type="checkbox" id="cFill"><i></i></span></label>
+        </div>
+
+        <div class="grp"><h4>Style</h4>
+          <div class="row col"><span>Fill opacity <span class="muted" id="opVal"></span></span><input type="range" id="cFillOp" min="0" max="100" step="5"></div>
+          <div class="row col"><span>Line width <span class="muted" id="lwVal"></span></span><input type="range" id="cLineW" min="1" max="6" step="0.5"></div>
+          <label class="row">Colour by pillar <span class="sw"><input type="checkbox" id="cColorBy"><i></i></span></label>
+          <label class="row">Base / line colour <input type="color" id="cBaseColor"></label>
+        </div>
+
+        <div class="grp"><h4>Scale</h4>
+          <label class="row">Mode <select id="cScaleMode"><option value="auto">Auto</option><option value="fixed">Fixed</option></select></label>
+          <label class="row">Max <input type="number" id="cScaleMax" min="1" step="1"></label>
+        </div>
+
+        <div class="grp"><h4>Title</h4>
+          <label class="row">Show title <span class="sw"><input type="checkbox" id="cTitleOn"><i></i></span></label>
+          <div class="row col"><input type="text" id="cTitleText" placeholder="e.g. Performance shape"></div>
+        </div>
+
+      </div>
+    </div>
   </div>
 
 <script>
@@ -44,43 +108,54 @@
 (function(){
   const $ = id => document.getElementById(id);
   const CX=220, CY=188, R=126, LBL=R+22;
-  let worksheet = null;
+  let worksheet = null, lastSeries = null;
 
   /* ---- per-pillar colours (edit freely; unknown categories cycle the fallback) ---- */
-  const PILLAR_COLORS = {
-    Volume:'#4E79A7', Speed:'#59A14F', Durability:'#B07AA1', SLA:'#F28E2B', Escalation:'#E15759'
-  };
+  const PILLAR_COLORS = { Volume:'#4E79A7', Speed:'#59A14F', Durability:'#B07AA1', SLA:'#F28E2B', Escalation:'#E15759' };
   const FALLBACK = ['#4E79A7','#F28E2B','#59A14F','#E15759','#B07AA1','#76B7B2','#EDC948','#FF9DA7','#9C755F','#BAB0AC'];
   const colorFor = (label,i) => PILLAR_COLORS[label] || FALLBACK[i % FALLBACK.length];
 
-  /* ---------- boot (viz extension: no configure, encodings drive it) ---------- */
+  /* ---- config (persisted in the workbook via settings) ---- */
+  const DEFAULTS = { scaleMode:'auto', scaleMax:100, grid:true, ringNums:true, axisNames:true,
+    values:true, dots:true, fill:true, fillOpacity:20, lineWidth:2, colorByPillar:true, baseColor:'#4E79A7',
+    showTitle:false, title:'' };
+  let cfg = { ...DEFAULTS };
+
+  function loadCfg(){
+    try{ const raw = tableau.extensions.settings.get('radarCfg'); if(raw) cfg = { ...DEFAULTS, ...JSON.parse(raw) }; }catch(_){}
+  }
+  let saveT=null;
+  function saveCfg(){
+    try{ tableau.extensions.settings.set('radarCfg', JSON.stringify(cfg));
+      clearTimeout(saveT); saveT=setTimeout(()=>{ try{ tableau.extensions.settings.saveAsync(); }catch(_){} }, 350);
+    }catch(_){}
+  }
+
+  /* ---------- boot ---------- */
+  wirePanel();
   tableau.extensions.initializeAsync().then(() => {
     worksheet = tableau.extensions.worksheetContent.worksheet;
-    // re-render when fields/encodings or underlying data change
+    loadCfg(); syncControls();
     worksheet.addEventListener(tableau.TableauEventType.SummaryDataChanged, render);
+    $('gear').style.display = 'flex';
     render();
   }).catch(e => showMsg('Couldn’t start', esc(String(e && e.message || e))));
 
-  /* ---------- render ---------- */
+  /* ---------- render (fetch data) ---------- */
   async function render(){
     if(!worksheet) return;
     try{
-      // 1) which field is on which encoding
       const spec  = await worksheet.getVisualSpecificationAsync();
       const marks = spec.marksSpecifications[spec.activeMarksSpecificationIndex];
       let catName=null, valName=null;
       (marks.encodings || []).forEach(enc => {
-        const f = enc.field || (enc.fields && enc.fields[0]);
-        if(!f) return;
+        const f = enc.field || (enc.fields && enc.fields[0]); if(!f) return;
         if(enc.id==='axis')  catName = f.name;
         if(enc.id==='value') valName = f.name;
       });
-      if(!catName || !valName){
-        return showMsg('Drop two fields',
-          'Put a dimension on <span class="enc">Axis</span> and a measure on <span class="enc">Value</span> in the Marks card.');
-      }
+      if(!catName || !valName)
+        return showMsg('Drop two fields','Put a dimension on <span class="enc">Axis</span> and a measure on <span class="enc">Value</span> in the Marks card.');
 
-      // 2) the data
       const dt = await fetchTable(worksheet);
       let ci = dt.columns.findIndex(c => c.fieldName === catName);
       let vi = dt.columns.findIndex(c => c.fieldName === valName);
@@ -88,7 +163,6 @@
       if(vi < 0) vi = dt.columns.findIndex(c => c.dataType==='float'  || c.dataType==='int');
       if(ci < 0 || vi < 0) return showMsg('Couldn’t read fields','Axis must be a text dimension and Value a number.');
 
-      // 3) one value per category (avg if repeated), skip a literal "Composite"
       const map = new Map();
       dt.data.forEach(row => {
         const label = (row[ci].formattedValue ?? '').trim();
@@ -100,46 +174,80 @@
       });
       const series = [...map.entries()].map(([label,e]) => ({label, value:e.s/e.n}));
       if(series.length < 3) return showMsg('Need at least 3 axes','Axis returned '+series.length+' category(ies); a radar needs 3+.');
-
       drawRadar(series);
     }catch(e){ showMsg('Error', esc(String(e && e.message || e))); }
   }
 
-  /* ---------- data fetch (new reader, with fallback) ---------- */
   async function fetchTable(ws){
     if(ws.getSummaryDataReaderAsync){
       const reader = await ws.getSummaryDataReaderAsync(undefined, { ignoreSelection:true });
-      const dt = await reader.getAllPagesAsync();
-      await reader.releaseAsync();
-      return dt;
+      const dt = await reader.getAllPagesAsync(); await reader.releaseAsync(); return dt;
     }
     return await ws.getSummaryDataAsync({ maxRows:5000, ignoreSelection:true });
   }
 
-  /* ---------- drawing (verified geometry, N axes, auto-scale) ---------- */
-  function niceMax(v){ if(v<=100) return 100; return Math.ceil(v/20)*20; }
-  function vertex(i,n,frac){ const a=(90 - i*(360/n))*Math.PI/180; return [CX + R*frac*Math.cos(a), CY - R*frac*Math.sin(a)]; }
+  /* ---------- drawing ---------- */
+  const niceMax = v => v<=100 ? 100 : Math.ceil(v/20)*20;
+  const vertex  = (i,n,frac) => { const a=(90 - i*(360/n))*Math.PI/180; return [CX + R*frac*Math.cos(a), CY - R*frac*Math.sin(a)]; };
+  function hexToRgba(hex,a){ const h=hex.replace('#',''); const x=parseInt(h.length===3?h.split('').map(c=>c+c).join(''):h,16);
+    return `rgba(${(x>>16)&255},${(x>>8)&255},${x&255},${a})`; }
 
   function drawRadar(series){
-    const n=series.length, max=niceMax(Math.max(...series.map(s=>s.value),1)); let g='';
-    [0.2,0.4,0.6,0.8,1].forEach(f=>{
-      const pts=series.map((_,i)=>vertex(i,n,f).join(',')).join(' ');
-      g+=`<polygon class="ring ${f===1?'out':''}" points="${pts}"/>`;
-      const [x,y]=vertex(0,n,f); g+=`<text class="ring-num" x="${x+4}" y="${y+3}">${Math.round(max*f)}</text>`;
-    });
-    series.forEach((_,i)=>{ const [x,y]=vertex(i,n,1); g+=`<line class="spoke" x1="${CX}" y1="${CY}" x2="${x}" y2="${y}"/>`; });
-    const dpts=series.map((s,i)=>vertex(i,n,Math.min(s.value/max,1)).join(',')).join(' ');
-    g+=`<polygon class="poly" points="${dpts}"/>`;
+    lastSeries = series;
+    const n=series.length;
+    const max = cfg.scaleMode==='fixed' ? Math.max(+cfg.scaleMax||1,1) : niceMax(Math.max(...series.map(s=>s.value),1));
+    const levels=[0.2,0.4,0.6,0.8,1]; let g='';
+
+    if(cfg.grid){
+      levels.forEach(f=>{ const pts=series.map((_,i)=>vertex(i,n,f).join(',')).join(' '); g+=`<polygon class="ring ${f===1?'out':''}" points="${pts}"/>`; });
+      series.forEach((_,i)=>{ const [x,y]=vertex(i,n,1); g+=`<line class="spoke" x1="${CX}" y1="${CY}" x2="${x}" y2="${y}"/>`; });
+    }
+    if(cfg.ringNums) levels.forEach(f=>{ const [x,y]=vertex(0,n,f); g+=`<text class="ring-num" x="${x+4}" y="${y+3}">${Math.round(max*f)}</text>`; });
+
+    const dpts = series.map((s,i)=>vertex(i,n,Math.min(s.value/max,1)).join(',')).join(' ');
+    const fill = cfg.fill ? hexToRgba(cfg.baseColor, (+cfg.fillOpacity||0)/100) : 'none';
+    g += `<polygon points="${dpts}" fill="${fill}" stroke="${cfg.baseColor}" stroke-width="${cfg.lineWidth}" stroke-linejoin="round"/>`;
+
     series.forEach((s,i)=>{
-      const col=colorFor(s.label,i);
+      const col = cfg.colorByPillar ? colorFor(s.label,i) : cfg.baseColor;
       const frac=Math.min(s.value/max,1); const [vx,vy]=vertex(i,n,frac);
-      g+=`<circle class="vtx" cx="${vx}" cy="${vy}" r="4" stroke="${col}"/>`;
-      const [lx,ly]=vertex(i,n,Math.min(frac+0.07,1.04));
-      g+=`<text class="axis-val" x="${lx}" y="${ly+4}" text-anchor="middle" fill="${col}">${fmt(s.value)}</text>`;
-      const [ax,ay]=vertex(i,n,LBL/R); let anc='middle'; if(ax<CX-12)anc='end'; else if(ax>CX+12)anc='start';
-      g+=`<text class="axis-label" x="${ax}" y="${ay+4}" text-anchor="${anc}" fill="${col}">${esc(s.label)}</text>`;
+      if(cfg.dots) g+=`<circle cx="${vx}" cy="${vy}" r="4" fill="#fff" stroke="${col}" stroke-width="2"/>`;
+      if(cfg.values){ const [lx,ly]=vertex(i,n,Math.min(frac+0.07,1.06)); g+=`<text class="axis-val" x="${lx}" y="${ly+4}" text-anchor="middle" fill="${col}">${fmt(s.value)}</text>`; }
+      if(cfg.axisNames){ const [ax,ay]=vertex(i,n,LBL/R); let anc='middle'; if(ax<CX-12)anc='end'; else if(ax>CX+12)anc='start';
+        g+=`<text class="axis-label" x="${ax}" y="${ay+4}" text-anchor="${anc}" fill="${col}">${esc(s.label)}</text>`; }
     });
+
+    if(cfg.showTitle && cfg.title) g+=`<text class="title" x="${CX}" y="15" text-anchor="middle">${esc(cfg.title)}</text>`;
+
     const svg=$('radar'); svg.innerHTML=g; svg.classList.remove('hide'); $('msg').classList.add('hide');
+  }
+  function redraw(){ if(lastSeries) drawRadar(lastSeries); }
+
+  /* ---------- settings panel ---------- */
+  function wirePanel(){
+    $('gear').onclick = ()=> $('panel').classList.add('open');
+    $('pClose').onclick = ()=> $('panel').classList.remove('open');
+
+    const toggle = (id,key)=> $(id).addEventListener('change', e=>{ cfg[key]=e.target.checked; saveCfg(); redraw(); });
+    toggle('cGrid','grid'); toggle('cRingNums','ringNums'); toggle('cAxisNames','axisNames');
+    toggle('cValues','values'); toggle('cDots','dots'); toggle('cFill','fill'); toggle('cColorBy','colorByPillar');
+    toggle('cTitleOn','showTitle');
+
+    $('cFillOp').addEventListener('input', e=>{ cfg.fillOpacity=+e.target.value; $('opVal').textContent=e.target.value+'%'; saveCfg(); redraw(); });
+    $('cLineW').addEventListener('input', e=>{ cfg.lineWidth=+e.target.value; $('lwVal').textContent=e.target.value+'px'; saveCfg(); redraw(); });
+    $('cBaseColor').addEventListener('input', e=>{ cfg.baseColor=e.target.value; saveCfg(); redraw(); });
+    $('cScaleMode').addEventListener('change', e=>{ cfg.scaleMode=e.target.value; saveCfg(); redraw(); });
+    $('cScaleMax').addEventListener('input', e=>{ cfg.scaleMax=+e.target.value; if(cfg.scaleMode==='fixed'){ saveCfg(); redraw(); } });
+    $('cTitleText').addEventListener('input', e=>{ cfg.title=e.target.value; saveCfg(); redraw(); });
+  }
+  function syncControls(){
+    $('cGrid').checked=cfg.grid; $('cRingNums').checked=cfg.ringNums; $('cAxisNames').checked=cfg.axisNames;
+    $('cValues').checked=cfg.values; $('cDots').checked=cfg.dots; $('cFill').checked=cfg.fill; $('cColorBy').checked=cfg.colorByPillar;
+    $('cTitleOn').checked=cfg.showTitle;
+    $('cFillOp').value=cfg.fillOpacity; $('opVal').textContent=cfg.fillOpacity+'%';
+    $('cLineW').value=cfg.lineWidth; $('lwVal').textContent=cfg.lineWidth+'px';
+    $('cBaseColor').value=cfg.baseColor; $('cScaleMode').value=cfg.scaleMode; $('cScaleMax').value=cfg.scaleMax;
+    $('cTitleText').value=cfg.title;
   }
 
   /* ---------- utils ---------- */
@@ -147,8 +255,8 @@
     $('radar').classList.add('hide'); $('msg').classList.remove('hide');
     $('msgText').innerHTML = '<b>'+esc(title)+'</b>'+(bodyHtml||'');
   }
-  function fmt(v){ return (Math.round(v*10)/10).toString().replace(/\.0$/,''); }
-  function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  const fmt = v => (Math.round(v*10)/10).toString().replace(/\.0$/,'');
+  const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 })();
 </script>
 </body>
