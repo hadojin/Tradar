@@ -272,7 +272,7 @@
     series.forEach((s,i)=>{
       const col = elementColor(s.label,i);
       const [vx,vy]=ptAt(i,n,R*Math.min(s.value/max,1));
-      if(cfg.dots && +cfg.dotSize>0) g+=`<circle cx="${vx}" cy="${vy}" r="${cfg.dotSize}" fill="#fff" stroke="${col}" stroke-width="2"/>`;
+      if(cfg.dots && +cfg.dotSize>0) g+=`<circle cx="${vx}" cy="${vy}" r="${cfg.dotSize}" fill="${col}"/>`;
       const [ax,ay]=ptAt(i,n,R + (+cfg.labelDist||22));   // name & number both centred (middle anchor) on the axis point
       const nameTxt = y => `<text x="${ax}" y="${y}" text-anchor="middle" fill="${col}" font-family="${ff}" font-size="${cfg.labelSize}" font-weight="600">${esc(s.label)}</text>`;
       const numTxt  = y => `<text x="${ax}" y="${y}" text-anchor="middle" fill="${col}" font-family="${ff}" font-size="${cfg.valueSize}" font-weight="700">${esc(s.labelText)}</text>`;
