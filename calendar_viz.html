@@ -77,6 +77,10 @@
         <label class="row">Max <input type="number" id="clScaleMax" min="1" step="1"></label>
         <div class="row"><span class="muted">Fixed range tames outliers: days at/above Max all read darkest, so the ramp spreads across the range you set.</span></div>
       </div>
+      <div class="grp"><h4>Activity threshold</h4>
+        <label class="row">Count day if units ≥ <input type="number" id="clActiveMin" min="0" step="1"></label>
+        <div class="row"><span class="muted">Days below this read as empty (not an active day) — filters out 1–2 unit noise days.</span></div>
+      </div>
       <div class="grp"><h4>Layout</h4>
         <label class="row">Week starts <select id="clWeekStart"><option value="mon">Monday</option><option value="sun">Sunday</option></select></label>
         <label class="row">Month labels <span class="sw"><input type="checkbox" id="clMonthLabels"><i></i></span></label>
@@ -114,7 +118,7 @@
   const DEFAULTS = {
     cellSize:13, cellGap:3, cellRadius:3,
     lowColor:'#cfe0f1', highColor:'#1d4675', emptyColor:'#e9edf2',
-    scaleMode:'auto', scaleMin:0, scaleMax:100,
+    scaleMode:'auto', scaleMin:0, scaleMax:100, activeMin:0,
     weekStart:'mon', monthLabels:true, weekdayLabels:true, showEmpty:true, emptyStyle:'solid',
     fontFamily:"'Segoe UI', Tahoma, sans-serif", labelSize:10, labelColor:'#8a95a0'
   };
@@ -218,7 +222,7 @@
       if(colFirst[col]===undefined) colFirst[col]=new Date(cur);
       const v=map.get(key(cur));
       const x=leftM+col*step, y=topM+row*step;
-      if(v===undefined){
+      if(v===undefined || v < (+cfg.activeMin||0)){
         if(cfg.showEmpty){
           if(cfg.emptyStyle==='dashed') g+=`<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="${cfg.cellRadius}" fill="none" stroke="${cfg.emptyColor}" stroke-width="1" stroke-dasharray="2 2"/>`;
           else g+=`<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="${cfg.cellRadius}" fill="${cfg.emptyColor}"/>`;
@@ -253,6 +257,7 @@
     RANGES.forEach(([id,k,suf])=> $(id).addEventListener('input', e=>{ cfg[k]=+e.target.value; const v=$(id+'V'); if(v)v.textContent=e.target.value+suf; saveCfg(); redraw(); }));
     COLORS.forEach(([id,k])=> $(id).addEventListener('input', e=>{ cfg[k]=e.target.value; saveCfg(); redraw(); }));
     SELECTS.forEach(([id,k])=> $(id).addEventListener('change', e=>{ cfg[k]=e.target.value; saveCfg(); redraw(); }));
+    $('clActiveMin').addEventListener('input', e=>{ cfg.activeMin=+e.target.value; saveCfg(); redraw(); });
     $('clScaleMin').addEventListener('input', e=>{ cfg.scaleMin=+e.target.value; if(cfg.scaleMode==='fixed'){ saveCfg(); redraw(); } });
     $('clScaleMax').addEventListener('input', e=>{ cfg.scaleMax=+e.target.value; if(cfg.scaleMode==='fixed'){ saveCfg(); redraw(); } });
   }
@@ -261,7 +266,7 @@
     RANGES.forEach(([id,k,suf])=>{ $(id).value=cfg[k]; const v=$(id+'V'); if(v)v.textContent=cfg[k]+suf; });
     COLORS.forEach(([id,k])=> $(id).value=cfg[k]);
     SELECTS.forEach(([id,k])=> $(id).value=cfg[k]);
-    $('clScaleMin').value=cfg.scaleMin; $('clScaleMax').value=cfg.scaleMax;
+    $('clScaleMin').value=cfg.scaleMin; $('clScaleMax').value=cfg.scaleMax; $('clActiveMin').value=cfg.activeMin;
   }
 
   /* ---------- tooltip ---------- */
