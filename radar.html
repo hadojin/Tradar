@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance Radar</title>
+<!-- Tableau Extensions API (hosted by Tableau) -->
+<script src="https://tableau.github.io/extensions-api/lib/tableau.extensions.1.latest.min.js"></script>
+<style>
+  :root{
+    --blue:#4E79A7; --blue-deep:#3B5E84; --blue-fill:rgba(78,121,167,.20);
+    --grid:#E4E4E4; --axis:#C7C7C7; --ink:#2b2b2b; --muted:#7a7a7a; --line:#e2e2e2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Benton Sans','Segoe UI',Tahoma,sans-serif;
+    color:var(--ink);background:#fff;display:flex;flex-direction:column;overflow:hidden;
+  }
+  #stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;position:relative}
+  svg{width:100%;height:100%}
+  .ring{fill:none;stroke:var(--grid);stroke-width:1}
+  .ring.out{stroke:var(--axis)}
+  .spoke{stroke:var(--grid);stroke-width:1}
+  .axis-label{font:600 12px 'Segoe UI',sans-serif;fill:var(--ink)}
+  .axis-val{font:600 11px 'Segoe UI',sans-serif;fill:var(--blue-deep)}
+  .ring-num{font:500 9px 'Segoe UI',sans-serif;fill:#b6b6b6}
+  .poly{fill:var(--blue-fill);stroke:var(--blue);stroke-width:2;stroke-linejoin:round;
+        transition:all .45s cubic-bezier(.4,0,.2,1)}
+  .vtx{fill:#fff;stroke:var(--blue);stroke-width:2;transition:all .45s cubic-bezier(.4,0,.2,1)}
+
+  /* top-right gear */
+  #gear{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:6px;border:1px solid var(--line);
+        background:#fff;color:#888;cursor:pointer;display:none;align-items:center;justify-content:center;
+        font-size:14px;line-height:1;z-index:5}
+  #gear:hover{color:var(--blue);border-color:var(--blue)}
+
+  /* setup / message screens */
+  .screen{position:absolute;inset:0;background:#fff;display:flex;align-items:center;justify-content:center;padding:18px}
+  .card{width:100%;max-width:340px}
+  .card h2{font:600 15px 'Segoe UI';margin-bottom:3px}
+  .card .sub{font:400 12px 'Segoe UI';color:var(--muted);margin-bottom:16px}
+  .fld{margin-bottom:11px}
+  .fld label{display:block;font:600 10px 'Segoe UI';letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .fld select{width:100%;font:400 13px 'Segoe UI';padding:7px 9px;border:1px solid #cfcfcf;border-radius:6px;background:#fff;cursor:pointer}
+  .fld select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(78,121,167,.15)}
+  .btn{width:100%;margin-top:6px;font:600 13px 'Segoe UI';color:#fff;background:var(--blue);border:0;border-radius:6px;padding:10px;cursor:pointer;transition:background .15s}
+  .btn:hover{background:var(--blue-deep)}
+  .btn:disabled{background:#bcbcbc;cursor:not-allowed}
+  .msg{text-align:center;color:var(--muted);font:400 13px 'Segoe UI';max-width:240px;line-height:1.5}
+  .msg b{color:var(--ink);display:block;margin-bottom:5px;font-weight:600}
+  .hide{display:none!important}
+</style>
+</head>
+<body>
+
+  <button id="gear" title="Configure">&#9881;</button>
+
+  <div id="stage">
+    <svg id="radar" viewBox="0 0 440 400" preserveAspectRatio="xMidYMid meet" class="hide"></svg>
+
+    <!-- loading / error message -->
+    <div id="msgScreen" class="screen">
+      <div class="msg" id="msgText"><b>Loading…</b>Connecting to the dashboard.</div>
+    </div>
+
+    <!-- setup -->
+    <div id="setupScreen" class="screen hide">
+      <div class="card">
+        <h2>Set up the radar</h2>
+        <div class="sub">Point it at a worksheet, then pick the axis &amp; value columns.</div>
+        <div class="fld">
+          <label>Worksheet</label>
+          <select id="wsSel"></select>
+        </div>
+        <div class="fld">
+          <label>Axis &nbsp;(category — e.g. Pillar)</label>
+          <select id="catSel"></select>
+        </div>
+        <div class="fld">
+          <label>Value &nbsp;(measure — e.g. Sub_Score)</label>
+          <select id="valSel"></select>
+        </div>
+        <button class="btn" id="saveBtn">Save &amp; draw radar</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+"use strict";
+(function(){
+  const $ = id => document.getElementById(id);
+  const CX=220, CY=188, R=126, LBL=R+22;
+  let listeners = [];
+
+  /* ---------------- boot ---------------- */
+  tableau.extensions.initializeAsync({ configure: openSetup }).then(() => {
+    $('gear').style.display = 'flex';
+    $('gear').onclick = openSetup;
+    $('saveBtn').onclick = saveSetup;
+    $('wsSel').onchange = loadColumnsForChosenSheet;
+    const cfg = readSettings();
+    if (cfg.sheet && findSheet(cfg.sheet)) render();
+    else openSetup();
+  }).catch(e => showMsg('Couldn’t start', String(e && e.message || e)));
+
+  /* ---------------- settings helpers ---------------- */
+  function readSettings(){
+    const s = tableau.extensions.settings;
+    return { sheet:s.get('sheet'), cat:s.get('cat'), val:s.get('val') };
+  }
+  function findSheet(name){
+    return tableau.extensions.dashboardContent.dashboard.worksheets.find(w => w.name === name);
+  }
+
+  /* ---------------- data fetch (works old & new Tableau) ---------------- */
+  async function fetchTable(ws){
+    const opts = { ignoreSelection:true, maxRows:5000 };
+    if (ws.getSummaryDataReaderAsync){
+      const reader = await ws.getSummaryDataReaderAsync(undefined, opts);
+      const dt = await reader.getAllPagesAsync();
+      await reader.releaseAsync();
+      return dt;
+    }
+    return await ws.getSummaryDataAsync(opts);   // fallback for < 2022.4
+  }
+
+  /* ---------------- setup screen ---------------- */
+  async function openSetup(){
+    clearListeners();
+    $('radar').classList.add('hide');
+    $('msgScreen').classList.add('hide');
+    const setup = $('setupScreen'); setup.classList.remove('hide');
+
+    const cfg = readSettings();
+    const wsSel = $('wsSel'); wsSel.innerHTML='';
+    tableau.extensions.dashboardContent.dashboard.worksheets.forEach(w=>{
+      const o=document.createElement('option'); o.value=w.name; o.textContent=w.name;
+      if(w.name===cfg.sheet) o.selected=true; wsSel.appendChild(o);
+    });
+    await loadColumnsForChosenSheet();
+  }
+
+  async function loadColumnsForChosenSheet(){
+    const cfg = readSettings();
+    const ws = findSheet($('wsSel').value);
+    const catSel=$('catSel'), valSel=$('valSel');
+    catSel.innerHTML='<option>…</option>'; valSel.innerHTML='<option>…</option>';
+    if(!ws) return;
+    let dt; try{ dt = await fetchTable(ws); }catch(e){ catSel.innerHTML=valSel.innerHTML='<option>(no data)</option>'; return; }
+    catSel.innerHTML=''; valSel.innerHTML='';
+    dt.columns.forEach(c=>{
+      const numeric = c.dataType==='float' || c.dataType==='int';
+      const o=document.createElement('option'); o.value=c.fieldName; o.textContent=c.fieldName;
+      if(numeric){ const ov=o.cloneNode(true); if(c.fieldName===cfg.val) ov.selected=true; valSel.appendChild(ov); }
+      else { if(c.fieldName===cfg.cat) o.selected=true; catSel.appendChild(o); }
+    });
+    if(!catSel.options.length) catSel.innerHTML='<option value="">(no text column)</option>';
+    if(!valSel.options.length) valSel.innerHTML='<option value="">(no measure)</option>';
+  }
+
+  async function saveSetup(){
+    const s = tableau.extensions.settings;
+    s.set('sheet', $('wsSel').value);
+    s.set('cat',   $('catSel').value);
+    s.set('val',   $('valSel').value);
+    await s.saveAsync();
+    render();
+  }
+
+  /* ---------------- render ---------------- */
+  async function render(){
+    clearListeners();
+    $('setupScreen').classList.add('hide');
+    const cfg = readSettings();
+    const ws = findSheet(cfg.sheet);
+    if(!ws){ return openSetup(); }
+    showMsg('Loading…','Reading '+cfg.sheet);
+
+    let dt; try{ dt = await fetchTable(ws); }
+    catch(e){ return showMsg('Couldn’t read data', String(e && e.message || e)); }
+
+    const ci = dt.columns.findIndex(c=>c.fieldName===cfg.cat);
+    const vi = dt.columns.findIndex(c=>c.fieldName===cfg.val);
+    if(ci<0||vi<0) return showMsg('Columns changed','Re-open settings (⚙) and re-pick the axis & value.');
+
+    // aggregate value by category (avg if a category repeats), skip a literal "Composite"
+    const map = new Map();
+    dt.data.forEach(row=>{
+      const label = (row[ci].formattedValue ?? '').trim();
+      if(!label || label.toLowerCase()==='composite') return;
+      const raw = row[vi].value;
+      const num = typeof raw==='number' ? raw : parseFloat(row[vi].formattedValue);
+      if(isNaN(num)) return;
+      const e = map.get(label) || {sum:0,n:0};
+      e.sum+=num; e.n++; map.set(label,e);
+    });
+    const series = [...map.entries()].map(([label,e])=>({label, value:e.sum/e.n}));
+
+    if(series.length<3) return showMsg('Need at least 3 axes','The chosen worksheet returned '+series.length+' category(ies). A radar needs 3+.');
+
+    drawRadar(series);
+    registerLive(ws);
+  }
+
+  function niceMax(v){ if(v<=100) return 100; return Math.ceil(v/20)*20; }
+
+  function vertex(i, n, frac){
+    const a = (90 - i*(360/n)) * Math.PI/180;
+    return [CX + R*frac*Math.cos(a), CY - R*frac*Math.sin(a)];
+  }
+
+  function drawRadar(series){
+    const n = series.length;
+    const max = niceMax(Math.max(...series.map(s=>s.value), 1));
+    const svg = $('radar');
+    let g = '';
+
+    // rings + ring numbers (along straight-up axis)
+    [0.2,0.4,0.6,0.8,1].forEach(f=>{
+      const pts = series.map((_,i)=>vertex(i,n,f).join(',')).join(' ');
+      g += `<polygon class="ring ${f===1?'out':''}" points="${pts}"/>`;
+      const [x,y]=vertex(0,n,f);
+      g += `<text class="ring-num" x="${x+4}" y="${y+3}">${Math.round(max*f)}</text>`;
+    });
+    // spokes
+    series.forEach((_,i)=>{ const [x,y]=vertex(i,n,1); g+=`<line class="spoke" x1="${CX}" y1="${CY}" x2="${x}" y2="${y}"/>`; });
+
+    // data polygon
+    const dpts = series.map((s,i)=>vertex(i,n,Math.min(s.value/max,1)).join(',')).join(' ');
+    g += `<polygon class="poly" points="${dpts}"/>`;
+
+    // vertices + value labels + axis labels
+    series.forEach((s,i)=>{
+      const frac=Math.min(s.value/max,1);
+      const [vx,vy]=vertex(i,n,frac); g+=`<circle class="vtx" cx="${vx}" cy="${vy}" r="3.5"/>`;
+      const [lx,ly]=vertex(i,n,Math.min(frac+0.07,1.04));
+      g+=`<text class="axis-val" x="${lx}" y="${ly+4}" text-anchor="middle">${fmt(s.value)}</text>`;
+      // axis name outside
+      const [ax,ay]=vertex(i,n,LBL/R);
+      let anc='middle'; if(ax<CX-12)anc='end'; else if(ax>CX+12)anc='start';
+      g+=`<text class="axis-label" x="${ax}" y="${ay+4}" text-anchor="${anc}">${esc(s.label)}</text>`;
+    });
+
+    svg.innerHTML = g;
+    svg.classList.remove('hide');
+    $('msgScreen').classList.add('hide');
+  }
+
+  /* ---------------- live updates ---------------- */
+  function registerLive(ws){
+    const E = tableau.TableauEventType;
+    listeners.push(ws.addEventListener(E.FilterChanged, render));
+    listeners.push(ws.addEventListener(E.MarkSelectionChanged, render));
+    tableau.extensions.dashboardContent.dashboard.getParametersAsync().then(ps=>{
+      ps.forEach(p=>listeners.push(p.addEventListener(E.ParameterChanged, render)));
+    });
+  }
+  function clearListeners(){ listeners.forEach(u=>{try{u();}catch(_){}}); listeners=[]; }
+
+  /* ---------------- utils ---------------- */
+  function showMsg(title, body){
+    $('radar').classList.add('hide');
+    $('setupScreen').classList.add('hide');
+    $('msgScreen').classList.remove('hide');
+    $('msgText').innerHTML = '<b>'+esc(title)+'</b>'+esc(body||'');
+  }
+  function fmt(v){ return (Math.round(v*10)/10).toString().replace(/\.0$/,''); }
+  function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  window.addEventListener('resize', ()=>{ /* viewBox handles scaling; nothing needed */ });
+})();
+</script>
+</body>
+</html>
