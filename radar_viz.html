@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance Radar (Viz)</title>
+<!-- Library is hosted alongside this file (same origin). Upload tableau.extensions.1.latest.min.js next to radar_viz.html. -->
+<script src="tableau.extensions.1.latest.min.js"></script>
+<style>
+  :root{
+    --blue:#4E79A7; --blue-deep:#3B5E84; --blue-fill:rgba(78,121,167,.20);
+    --grid:#E4E4E4; --axis:#C7C7C7; --ink:#2b2b2b; --muted:#7a7a7a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Benton Sans','Segoe UI',Tahoma,sans-serif;color:var(--ink);background:#fff;
+       display:flex;overflow:hidden}
+  #stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0}
+  svg{width:100%;height:100%}
+  .ring{fill:none;stroke:var(--grid);stroke-width:1}
+  .ring.out{stroke:var(--axis)}
+  .spoke{stroke:var(--grid);stroke-width:1}
+  .axis-label{font:600 12px 'Segoe UI',sans-serif;fill:var(--ink)}
+  .axis-val{font:600 11px 'Segoe UI',sans-serif;fill:var(--blue-deep)}
+  .ring-num{font:500 9px 'Segoe UI',sans-serif;fill:#b6b6b6}
+  .poly{fill:var(--blue-fill);stroke:var(--blue);stroke-width:2;stroke-linejoin:round;
+        transition:all .45s cubic-bezier(.4,0,.2,1)}
+  .vtx{fill:#fff;stroke:var(--blue);stroke-width:2;transition:all .45s cubic-bezier(.4,0,.2,1)}
+  #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:#fff}
+  .msg{text-align:center;color:var(--muted);font:400 13px 'Segoe UI';max-width:280px;line-height:1.55}
+  .msg b{color:var(--ink);display:block;margin-bottom:6px;font:600 14px 'Segoe UI'}
+  .msg .enc{color:var(--blue-deep);font-weight:600}
+  .hide{display:none!important}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <svg id="radar" viewBox="0 0 440 400" preserveAspectRatio="xMidYMid meet" class="hide"></svg>
+    <div id="msg"><div class="msg" id="msgText"><b>Loading…</b>Starting the radar.</div></div>
+  </div>
+
+<script>
+"use strict";
+(function(){
+  const $ = id => document.getElementById(id);
+  const CX=220, CY=188, R=126, LBL=R+22;
+  let worksheet = null;
+
+  /* ---- per-pillar colours (edit freely; unknown categories cycle the fallback) ---- */
+  const PILLAR_COLORS = {
+    Volume:'#4E79A7', Speed:'#59A14F', Durability:'#B07AA1', SLA:'#F28E2B', Escalation:'#E15759'
+  };
+  const FALLBACK = ['#4E79A7','#F28E2B','#59A14F','#E15759','#B07AA1','#76B7B2','#EDC948','#FF9DA7','#9C755F','#BAB0AC'];
+  const colorFor = (label,i) => PILLAR_COLORS[label] || FALLBACK[i % FALLBACK.length];
+
+  /* ---------- boot (viz extension: no configure, encodings drive it) ---------- */
+  tableau.extensions.initializeAsync().then(() => {
+    worksheet = tableau.extensions.worksheetContent.worksheet;
+    // re-render when fields/encodings or underlying data change
+    worksheet.addEventListener(tableau.TableauEventType.SummaryDataChanged, render);
+    render();
+  }).catch(e => showMsg('Couldn’t start', esc(String(e && e.message || e))));
+
+  /* ---------- render ---------- */
+  async function render(){
+    if(!worksheet) return;
+    try{
+      // 1) which field is on which encoding
+      const spec  = await worksheet.getVisualSpecificationAsync();
+      const marks = spec.marksSpecifications[spec.activeMarksSpecificationIndex];
+      let catName=null, valName=null;
+      (marks.encodings || []).forEach(enc => {
+        const f = enc.field || (enc.fields && enc.fields[0]);
+        if(!f) return;
+        if(enc.id==='axis')  catName = f.name;
+        if(enc.id==='value') valName = f.name;
+      });
+      if(!catName || !valName){
+        return showMsg('Drop two fields',
+          'Put a dimension on <span class="enc">Axis</span> and a measure on <span class="enc">Value</span> in the Marks card.');
+      }
+
+      // 2) the data
+      const dt = await fetchTable(worksheet);
+      let ci = dt.columns.findIndex(c => c.fieldName === catName);
+      let vi = dt.columns.findIndex(c => c.fieldName === valName);
+      if(ci < 0) ci = dt.columns.findIndex(c => c.dataType==='string' || c.dataType==='bool');
+      if(vi < 0) vi = dt.columns.findIndex(c => c.dataType==='float'  || c.dataType==='int');
+      if(ci < 0 || vi < 0) return showMsg('Couldn’t read fields','Axis must be a text dimension and Value a number.');
+
+      // 3) one value per category (avg if repeated), skip a literal "Composite"
+      const map = new Map();
+      dt.data.forEach(row => {
+        const label = (row[ci].formattedValue ?? '').trim();
+        if(!label || label.toLowerCase()==='composite') return;
+        const raw = row[vi].value;
+        const num = typeof raw==='number' ? raw : parseFloat(row[vi].formattedValue);
+        if(isNaN(num)) return;
+        const e = map.get(label) || {s:0,n:0}; e.s+=num; e.n++; map.set(label,e);
+      });
+      const series = [...map.entries()].map(([label,e]) => ({label, value:e.s/e.n}));
+      if(series.length < 3) return showMsg('Need at least 3 axes','Axis returned '+series.length+' category(ies); a radar needs 3+.');
+
+      drawRadar(series);
+    }catch(e){ showMsg('Error', esc(String(e && e.message || e))); }
+  }
+
+  /* ---------- data fetch (new reader, with fallback) ---------- */
+  async function fetchTable(ws){
+    if(ws.getSummaryDataReaderAsync){
+      const reader = await ws.getSummaryDataReaderAsync(undefined, { ignoreSelection:true });
+      const dt = await reader.getAllPagesAsync();
+      await reader.releaseAsync();
+      return dt;
+    }
+    return await ws.getSummaryDataAsync({ maxRows:5000, ignoreSelection:true });
+  }
+
+  /* ---------- drawing (verified geometry, N axes, auto-scale) ---------- */
+  function niceMax(v){ if(v<=100) return 100; return Math.ceil(v/20)*20; }
+  function vertex(i,n,frac){ const a=(90 - i*(360/n))*Math.PI/180; return [CX + R*frac*Math.cos(a), CY - R*frac*Math.sin(a)]; }
+
+  function drawRadar(series){
+    const n=series.length, max=niceMax(Math.max(...series.map(s=>s.value),1)); let g='';
+    [0.2,0.4,0.6,0.8,1].forEach(f=>{
+      const pts=series.map((_,i)=>vertex(i,n,f).join(',')).join(' ');
+      g+=`<polygon class="ring ${f===1?'out':''}" points="${pts}"/>`;
+      const [x,y]=vertex(0,n,f); g+=`<text class="ring-num" x="${x+4}" y="${y+3}">${Math.round(max*f)}</text>`;
+    });
+    series.forEach((_,i)=>{ const [x,y]=vertex(i,n,1); g+=`<line class="spoke" x1="${CX}" y1="${CY}" x2="${x}" y2="${y}"/>`; });
+    const dpts=series.map((s,i)=>vertex(i,n,Math.min(s.value/max,1)).join(',')).join(' ');
+    g+=`<polygon class="poly" points="${dpts}"/>`;
+    series.forEach((s,i)=>{
+      const col=colorFor(s.label,i);
+      const frac=Math.min(s.value/max,1); const [vx,vy]=vertex(i,n,frac);
+      g+=`<circle class="vtx" cx="${vx}" cy="${vy}" r="4" stroke="${col}"/>`;
+      const [lx,ly]=vertex(i,n,Math.min(frac+0.07,1.04));
+      g+=`<text class="axis-val" x="${lx}" y="${ly+4}" text-anchor="middle" fill="${col}">${fmt(s.value)}</text>`;
+      const [ax,ay]=vertex(i,n,LBL/R); let anc='middle'; if(ax<CX-12)anc='end'; else if(ax>CX+12)anc='start';
+      g+=`<text class="axis-label" x="${ax}" y="${ay+4}" text-anchor="${anc}" fill="${col}">${esc(s.label)}</text>`;
+    });
+    const svg=$('radar'); svg.innerHTML=g; svg.classList.remove('hide'); $('msg').classList.add('hide');
+  }
+
+  /* ---------- utils ---------- */
+  function showMsg(title, bodyHtml){
+    $('radar').classList.add('hide'); $('msg').classList.remove('hide');
+    $('msgText').innerHTML = '<b>'+esc(title)+'</b>'+(bodyHtml||'');
+  }
+  function fmt(v){ return (Math.round(v*10)/10).toString().replace(/\.0$/,''); }
+  function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+})();
+</script>
+</body>
+</html>
