@@ -105,6 +105,7 @@
         <label class="row">Outline colour <input type="color" id="cStrokeColor"></label>
         <div class="row col"><span>Line width <span class="muted" id="cLineWV"></span></span><input type="range" id="cLineW" min="0" max="6" step="0.5"></div>
         <label class="row">Gridline colour <input type="color" id="cGridColor"></label>
+        <div class="row col"><span>Gridline width <span class="muted" id="cGridWidthV"></span></span><input type="range" id="cGridWidth" min="0" max="4" step="0.5"></div>
         <label class="row">Scale-number colour <input type="color" id="cRingNumColor"></label>
         <div class="row col"><span>Dot size <span class="muted" id="cDotSizeV"></span></span><input type="range" id="cDotSize" min="0" max="8" step="0.5"></div>
       </div>
@@ -142,7 +143,7 @@
 
   /* ---- config descriptors (drive both binding and sync) ---- */
   const TOGGLES = [['cGrid','grid'],['cRingNums','ringNums'],['cAxisNames','axisNames'],['cValues','values'],['cDots','dots'],['cFill','fill'],['cColorBy','colorByPillar'],['cTitleOn','showTitle']];
-  const RANGES  = [['cFillOp','fillOpacity','%'],['cLineW','lineWidth','px'],['cDotSize','dotSize','px'],['cLabelSize','labelSize','px'],['cNumSize','valueSize','px'],['cTitleSize','titleSize','px'],['cRingNumSize','ringNumSize','px'],['cChartSize','chartSize','%'],['cLabelDist','labelDist','px']];
+  const RANGES  = [['cFillOp','fillOpacity','%'],['cLineW','lineWidth','px'],['cGridWidth','gridWidth','px'],['cDotSize','dotSize','px'],['cLabelSize','labelSize','px'],['cNumSize','valueSize','px'],['cTitleSize','titleSize','px'],['cRingNumSize','ringNumSize','px'],['cChartSize','chartSize','%'],['cLabelDist','labelDist','px']];
   const COLORS  = [['cFillColor','fillColor'],['cStrokeColor','strokeColor'],['cGridColor','gridColor'],['cRingNumColor','ringNumColor'],['cTitleColor','titleColor'],['cTextColor','textColor']];
   const SELECTS = [['cNumberSrc','numberSource'],['cFont','fontFamily'],['cScaleMode','scaleMode']];
 
@@ -152,7 +153,7 @@
     numberSource:'contribution',
     fontFamily:"'Segoe UI', Tahoma, sans-serif", labelSize:12, valueSize:12, titleSize:14, ringNumSize:9,
     fillColor:'#4E79A7', fillOpacity:20, strokeColor:'#4E79A7', lineWidth:2,
-    gridColor:'#E4E4E4', ringNumColor:'#b6b6b6', dotSize:4,
+    gridColor:'#E4E4E4', gridWidth:1, ringNumColor:'#b6b6b6', dotSize:4,
     chartSize:100, labelDist:22,
     scaleMode:'auto', scaleMax:100,
     showTitle:false, title:'', titleColor:'#2b2b2b'
@@ -224,10 +225,12 @@
 
   /* what number to print by each spoke */
   function numberText(label, value, labelFieldText){
-    if(cfg.numberSource==='value') return fmt(value);
-    if(labelFieldText!=null && labelFieldText!=='') return labelFieldText;      // real Contribution if a Label field is mapped
-    if(WEIGHTS[label]!=null) return fmt(WEIGHTS[label]*value);                  // else compute weight × Sub_Score
-    return fmt(value);
+    let num;
+    if(cfg.numberSource==='value') num = value;
+    else if(labelFieldText!=null && labelFieldText!==''){ const p=parseFloat(labelFieldText); if(isNaN(p)) return labelFieldText; num=p; }
+    else if(WEIGHTS[label]!=null) num = WEIGHTS[label]*value;                   // Contribution = weight × Sub_Score
+    else num = value;
+    return String(Math.round(num));                                            // always rounded to a whole number
   }
 
   async function fetchTable(ws){
@@ -254,10 +257,10 @@
     const max = cfg.scaleMode==='fixed' ? Math.max(+cfg.scaleMax||1,1) : niceMax(Math.max(...series.map(s=>s.value),1));
     const ff = cfg.fontFamily, levels=[0.2,0.4,0.6,0.8,1]; let g='';
 
-    if(cfg.grid){
+    if(cfg.grid && +cfg.gridWidth>0){
       levels.forEach(f=>{ const pts=series.map((_,i)=>ptAt(i,n,R*f).join(',')).join(' ');
-        g+=`<polygon points="${pts}" fill="none" stroke="${cfg.gridColor}" stroke-width="1"/>`; });
-      series.forEach((_,i)=>{ const [x,y]=ptAt(i,n,R); g+=`<line x1="${CX}" y1="${CY}" x2="${x}" y2="${y}" stroke="${cfg.gridColor}" stroke-width="1"/>`; });
+        g+=`<polygon points="${pts}" fill="none" stroke="${cfg.gridColor}" stroke-width="${cfg.gridWidth}"/>`; });
+      series.forEach((_,i)=>{ const [x,y]=ptAt(i,n,R); g+=`<line x1="${CX}" y1="${CY}" x2="${x}" y2="${y}" stroke="${cfg.gridColor}" stroke-width="${cfg.gridWidth}"/>`; });
     }
     if(cfg.ringNums) levels.forEach(f=>{ const [x,y]=ptAt(0,n,R*f);
       g+=`<text x="${x+4}" y="${y+3}" fill="${cfg.ringNumColor}" font-family="${ff}" font-size="${cfg.ringNumSize}" font-weight="500">${Math.round(max*f)}</text>`; });
@@ -270,10 +273,12 @@
       const col = elementColor(s.label,i);
       const [vx,vy]=ptAt(i,n,R*Math.min(s.value/max,1));
       if(cfg.dots && +cfg.dotSize>0) g+=`<circle cx="${vx}" cy="${vy}" r="${cfg.dotSize}" fill="#fff" stroke="${col}" stroke-width="2"/>`;
-      const [ax,ay]=ptAt(i,n,R + (+cfg.labelDist||22)); let anc='middle'; if(ax<CX-12)anc='end'; else if(ax>CX+12)anc='start';
-      const both = cfg.axisNames && cfg.values;
-      if(cfg.axisNames) g+=`<text x="${ax}" y="${both?ay-3:ay+4}" text-anchor="${anc}" fill="${col}" font-family="${ff}" font-size="${cfg.labelSize}" font-weight="600">${esc(s.label)}</text>`;
-      if(cfg.values)    g+=`<text x="${ax}" y="${both?ay+(+cfg.labelSize):ay+4}" text-anchor="${anc}" fill="${col}" font-family="${ff}" font-size="${cfg.valueSize}" font-weight="700">${esc(s.labelText)}</text>`;
+      const [ax,ay]=ptAt(i,n,R + (+cfg.labelDist||22));   // name & number both centred (middle anchor) on the axis point
+      const nameTxt = y => `<text x="${ax}" y="${y}" text-anchor="middle" fill="${col}" font-family="${ff}" font-size="${cfg.labelSize}" font-weight="600">${esc(s.label)}</text>`;
+      const numTxt  = y => `<text x="${ax}" y="${y}" text-anchor="middle" fill="${col}" font-family="${ff}" font-size="${cfg.valueSize}" font-weight="700">${esc(s.labelText)}</text>`;
+      if(cfg.axisNames && cfg.values){ g += nameTxt(ay-3) + numTxt(ay + (+cfg.valueSize)); }   // number centred directly under the name
+      else if(cfg.axisNames) g += nameTxt(ay+4);
+      else if(cfg.values)    g += numTxt(ay+4);
     });
 
     if(cfg.showTitle && cfg.title) g+=`<text x="${CX}" y="16" text-anchor="middle" fill="${cfg.titleColor}" font-family="${ff}" font-size="${cfg.titleSize}" font-weight="700">${esc(cfg.title)}</text>`;
