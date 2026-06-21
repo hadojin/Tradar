@@ -13,7 +13,7 @@
   #stage{flex:1;position:relative;display:flex;min-height:0}
   #hdr{flex:1;position:relative;display:flex;align-items:center;justify-content:space-between;gap:24px;overflow:hidden}
   #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:#fff}
-  .msg{text-align:center;color:var(--muted);font:400 13px 'Segoe UI';max-width:340px;line-height:1.55}
+  .msg{text-align:center;color:var(--muted);font:400 13px 'Segoe UI';max-width:360px;line-height:1.55}
   .msg b{color:var(--ink);display:block;margin-bottom:6px;font:600 14px 'Segoe UI'}
   .msg .enc{color:var(--blue-deep);font-weight:600}
   .hide{display:none!important}
@@ -50,7 +50,7 @@
   .row input[type=range]{width:120px}
   .row input[type=text]{font:500 12px 'Segoe UI';padding:5px 7px;border:1px solid #cfcfcf;border-radius:5px;width:100%}
   .row input[type=color]{width:30px;height:22px;border:1px solid #cfcfcf;border-radius:5px;padding:0;background:#fff;cursor:pointer}
-  .row select{max-width:150px;font:500 12px 'Segoe UI';padding:4px 6px;border:1px solid #cfcfcf;border-radius:5px;background:#fff;cursor:pointer}
+  .row select{font:500 12px 'Segoe UI';padding:4px 6px;border:1px solid #cfcfcf;border-radius:5px;background:#fff;cursor:pointer}
   .sw{position:relative;width:34px;height:19px;flex:0 0 auto;cursor:pointer}
   .sw input{display:none}
   .sw i{position:absolute;inset:0;background:#d2d2d2;border-radius:999px;transition:background .16s}
@@ -62,6 +62,10 @@
   .styt{border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;font:600 11px 'Segoe UI';color:#555}
   .styt.on{border-color:var(--blue);box-shadow:0 0 0 2px rgba(78,121,167,.15)}
   .styt .sw2{display:block;height:20px;border-radius:5px;margin-bottom:5px}
+  .frow{border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:7px}
+  .frow .fn{font:600 11px 'Consolas',monospace;color:#777;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .frow .fg{display:grid;grid-template-columns:1fr 84px 50px;gap:5px}
+  .frow input,.frow select{font:500 11px 'Segoe UI';padding:4px 6px;border:1px solid #d6d6d6;border-radius:4px;width:100%}
   .pfoot{flex:0 0 auto;padding:10px 14px;border-top:1px solid var(--line)}
   .pfoot button{width:100%;font:600 13px 'Segoe UI';color:#fff;background:var(--blue);border:0;border-radius:6px;padding:10px;cursor:pointer}
 </style>
@@ -75,13 +79,19 @@
   <div id="panel">
     <div class="phead"><h3>Header settings</h3><button class="x" id="pClose">&times;</button></div>
     <div class="tabs" id="tabs">
-      <button class="on" data-t="style">Style</button>
+      <button class="on" data-t="fields">Fields</button>
+      <button data-t="style">Style</button>
       <button data-t="bg">Background</button>
       <button data-t="colour">Colour</button>
       <button data-t="layout">Layout</button>
     </div>
     <div class="pbody">
-      <div class="tab on" id="t-style"><div class="grp"><h4>Style preset</h4><div class="styles" id="styles"></div></div></div>
+      <div class="tab on" id="t-fields"><div class="grp"><h4>Fields</h4>
+        <div class="muted" style="margin-bottom:7px">Name &amp; Score are fixed. For every other field set its role (Eyebrow / Tag / Badge / Hide), rename it, and add a unit.</div>
+        <div id="fields"></div>
+      </div></div>
+
+      <div class="tab" id="t-style"><div class="grp"><h4>Style preset</h4><div class="styles" id="styles"></div></div></div>
 
       <div class="tab" id="t-bg"><div class="grp"><h4>Background</h4>
         <label class="row">Style <select id="hBgStyle"><option value="gradient">Gradient</option><option value="solid">Solid</option></select></label>
@@ -110,7 +120,8 @@
           <option value="'Benton Sans','Segoe UI',sans-serif">Benton Sans</option>
           <option value="Arial, Helvetica, sans-serif">Arial</option></select></label>
       </div>
-      <div class="grp"><h4>Labels</h4>
+      <div class="grp"><h4>Numbers</h4>
+        <label class="row">Decimals <select id="hDecimals"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="tableau">Use Tableau</option></select></label>
         <label class="row">Score suffix <input type="text" id="hScoreMax" style="max-width:80px" placeholder="/100"></label>
         <label class="row">Eyebrow UPPERCASE <span class="sw"><input type="checkbox" id="hEyebrowUpper"><i></i></span></label>
         <label class="row">Confidence dot on field <input type="text" id="hConfMatch" style="max-width:90px" placeholder="conf"></label>
@@ -124,11 +135,11 @@
 (function(){
   const $ = id => document.getElementById(id);
   const DIALOG = new URLSearchParams(location.search).get('dialog')==='1';
-  let worksheet=null, last=null;
+  let worksheet=null, last=null, lastSig='';
 
   const RANGES = [['hNameSize','nameSize','px'],['hScoreSize','scoreSize','px'],['hPad','padding','px'],['hRadius','radius','px']];
   const COLORS = [['hBg1','bg1'],['hBg2','bg2'],['hText','textColor'],['hSub','subColor'],['hScoreColor','scoreColor'],['hBadgeBg','badgeBg'],['hBadgeText','badgeText']];
-  const SELECTS= [['hBgStyle','bgStyle'],['hScoreSide','scoreSide'],['hFont','fontFamily']];
+  const SELECTS= [['hBgStyle','bgStyle'],['hScoreSide','scoreSide'],['hFont','fontFamily'],['hDecimals','decimals']];
   const TOGGLES= [['hSpectrum','spectrum'],['hEyebrowUpper','eyebrowUpper']];
   const TEXTS  = [['hScoreMax','scoreMax'],['hConfMatch','confMatch']];
 
@@ -144,11 +155,12 @@
     preset:'Navy gold', bgStyle:'gradient', bg1:'#0C1E36', bg2:'#102845', spectrum:true,
     textColor:'#ffffff', subColor:'#E7D5A8', scoreColor:'#C9A227', badgeBg:'#1b3454', badgeText:'#dfe6f0',
     nameSize:46, scoreSize:84, padding:30, radius:18, scoreSide:'right',
-    fontFamily:"'Segoe UI', Tahoma, sans-serif", scoreMax:'/100', eyebrowUpper:true, confMatch:'conf'
+    fontFamily:"'Segoe UI', Tahoma, sans-serif", decimals:'0', scoreMax:'/100', eyebrowUpper:true, confMatch:'conf',
+    fields:{}
   };
   let cfg = JSON.parse(JSON.stringify(DEFAULTS));
 
-  function loadCfg(){ try{ const r=tableau.extensions.settings.get('hdrCfg'); if(r) cfg={...JSON.parse(JSON.stringify(DEFAULTS)),...JSON.parse(r)}; }catch(_){} }
+  function loadCfg(){ try{ const r=tableau.extensions.settings.get('hdrCfg'); if(r) cfg={...JSON.parse(JSON.stringify(DEFAULTS)),...JSON.parse(r)}; if(!cfg.fields)cfg.fields={}; }catch(_){} }
   let saveT=null;
   function saveCfg(){ try{ tableau.extensions.settings.set('hdrCfg', JSON.stringify(cfg));
     clearTimeout(saveT); saveT=setTimeout(()=>{ try{ tableau.extensions.settings.saveAsync(); }catch(_){} },250); }catch(_){} }
@@ -167,12 +179,14 @@
   function openConfig(){
     const url = location.href.split('#')[0].split('?')[0] + '?dialog=1';
     let style; try{ style=tableau.DialogStyle.Modeless; }catch(_){ style='modeless'; }
-    try{ tableau.extensions.ui.displayDialogAsync(url,'x',{width:320,height:540,dialogStyle:style}).then(()=>{}).catch(()=>{}); }catch(_){}
+    try{ tableau.extensions.ui.displayDialogAsync(url,'x',{width:330,height:560,dialogStyle:style}).then(()=>{}).catch(()=>{}); }catch(_){}
   }
   function initDialog(){
     document.body.classList.add('dialog');
     tableau.extensions.initializeDialogAsync().then(()=>{
       loadCfg(); buildStyles(); bindControls(); syncControls(); initTabs();
+      let fl=[]; try{ fl=JSON.parse(tableau.extensions.settings.get('hdrFields')||'[]'); }catch(_){}
+      buildFieldEditor(fl);
       $('pfoot').style.display='block';
       const done=()=>{ try{ tableau.extensions.ui.closeDialog('done'); }catch(_){} };
       $('pDone').onclick=done; $('pClose').onclick=done;
@@ -184,30 +198,43 @@
       document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.id==='t-'+b.dataset.t)); });
   }
 
+  /* ---------- render: read summary columns directly (robust to multi-field) ---------- */
   async function render(){
     if(!worksheet) return;
     try{
       const spec = await worksheet.getVisualSpecificationAsync();
       const marks = spec.marksSpecifications[spec.activeMarksSpecificationIndex];
-      let nameF=null, scoreF=null, metricFs=[], contextFs=[];
+      let nameF=null, scoreF=null;
       (marks.encodings||[]).forEach(enc=>{
-        const fs = (enc.fields && enc.fields.length) ? enc.fields : (enc.field ? [enc.field] : []);
-        const names = fs.map(f=>f.name);
-        if(enc.id==='name')        nameF = names[0]||null;
-        else if(enc.id==='score')  scoreF = names[0]||null;
-        else if(enc.id==='metrics') metricFs = names;
-        else if(enc.id==='context') contextFs = names;
+        const f = enc.field || (enc.fields && enc.fields[0]); if(!f) return;
+        if(enc.id==='name') nameF=f.name; else if(enc.id==='score') scoreF=f.name;
       });
       const dt = await fetchTable(worksheet);
       if(!dt.data.length) return showMsg('No data','Filter the sheet to one agent.');
       const row=dt.data[0];
-      const cell=fn=>{ if(!fn) return null; const ci=dt.columns.findIndex(c=>c.fieldName===fn); if(ci<0) return null;
-        const c=row[ci]; return { fmt:c.formattedValue, raw: typeof c.value==='number'?c.value:parseFloat(c.formattedValue) }; };
-      const name=cell(nameF), score=cell(scoreF);
-      if(!name || !score) return showMsg('Assign Name &amp; Score','Put a dimension on <span class="enc">Name</span> and a measure on <span class="enc">Score</span>. Metrics &amp; Context are optional.');
-      const metrics = metricFs.map(fn=>({ label:fn, ...cell(fn) })).filter(m=>m && m.fmt!=null);
-      const context = contextFs.map(fn=>({ label:fn, ...cell(fn) })).filter(c=>c && c.fmt!=null && c.fmt!=='');
-      draw({name, score, metrics, context});
+      const cell=ci=>{ const c=row[ci]; return { fmt:c.formattedValue, raw: typeof c.value==='number'?c.value:parseFloat(c.formattedValue) }; };
+      const isNum=c=>c.dataType==='float'||c.dataType==='int';
+      // fall back: name = first string col, score = first measure col
+      if(!nameF){ const c=dt.columns.find(c=>!isNum(c)); nameF=c&&c.fieldName; }
+      if(!scoreF){ const c=dt.columns.find(c=>isNum(c)); scoreF=c&&c.fieldName; }
+      const nameCol = dt.columns.find(c=>c.fieldName===nameF);
+      const scoreCol = dt.columns.find(c=>c.fieldName===scoreF);
+      if(!nameCol || !scoreCol) return showMsg('Assign Name &amp; Score','Put a dimension on <span class="enc">Name</span> and a measure on <span class="enc">Score</span>.');
+
+      const others = dt.columns.filter(c=>c.fieldName!==nameF && c.fieldName!==scoreF);
+      // expose field list for the dialog editor
+      const sig = others.map(c=>c.fieldName).join('|');
+      if(sig!==lastSig){ lastSig=sig; try{ tableau.extensions.settings.set('hdrFields', JSON.stringify(others.map(c=>({field:c.fieldName, num:isNum(c)})))); tableau.extensions.settings.saveAsync(); }catch(_){} }
+
+      let firstStr=true;
+      const items = others.map(c=>{
+        const ov = cfg.fields[c.fieldName] || {};
+        const num = isNum(c);
+        let role = ov.role; if(!role){ role = num ? 'badge' : (firstStr ? 'eyebrow' : 'tag'); }
+        if(role==='eyebrow') firstStr=false;
+        return { field:c.fieldName, num, role, label: ov.name || clean(c.fieldName), unit: ov.unit||'', ...cell(c.index) };
+      });
+      draw({ name:cell(nameCol.index), score:cell(scoreCol.index), items });
     }catch(e){ showMsg('Error', esc(String(e&&e.message||e))); }
   }
   async function fetchTable(ws){
@@ -215,23 +242,28 @@
     return await ws.getSummaryDataAsync({maxRows:50,ignoreSelection:true});
   }
 
+  /* ---------- formatting + draw ---------- */
+  function clean(f){ return String(f).replace(/^[A-Za-z]+\((.*)\)$/,'$1').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim(); }
+  function fmtVal(it){ if(cfg.decimals==='tableau' || isNaN(it.raw)) return it.fmt;
+    return (Math.round(it.raw*Math.pow(10,+cfg.decimals))/Math.pow(10,+cfg.decimals)).toFixed(+cfg.decimals); }
   function confColor(v){ return v>=80?'#3F8F63':v>=50?'#C9A227':'#C2410C'; }
   function pill(html){ return `<span class="pill" style="background:${cfg.badgeBg};color:${cfg.badgeText}">${html}</span>`; }
+
   function draw(v){
     const bg = cfg.bgStyle==='gradient' ? `linear-gradient(135deg,${cfg.bg1},${cfg.bg2})` : cfg.bg1;
-    const eyebrowF = v.context[0];                       // 1st Context field = eyebrow (date/period)
-    const tagFs = v.context.slice(1);                    // rest = tags (team, ...)
-    const eyebrow = eyebrowF ? `<div class="h-eyebrow" style="color:${cfg.subColor};font-size:${Math.max(10,Math.round(cfg.nameSize*0.23))}px;text-transform:${cfg.eyebrowUpper?'uppercase':'none'}">${esc(eyebrowF.fmt)}</div>` : '';
-    const tagPills = tagFs.map(t=>pill(`<b class="mono">${esc(t.fmt)}</b>`)).join('');
     const cm = (cfg.confMatch||'').toLowerCase();
-    const badges = v.metrics.map(m=>{
-      const isConf = cm && m.label.toLowerCase().includes(cm) && !isNaN(m.raw);
-      const dot = isConf ? `<span class="gdot" style="background:${confColor(m.raw)}"></span>` : '';
-      return pill(`${dot}${esc(m.label)} <span class="mono">${esc(m.fmt)}</span>`);
+    const eyebrowTxt = v.items.filter(i=>i.role==='eyebrow').map(i=>esc(i.fmt)).join('  ·  ');
+    const tags = v.items.filter(i=>i.role==='tag').map(i=>pill(`<b class="mono">${esc(i.fmt)}</b>`)).join('');
+    const badges = v.items.filter(i=>i.role==='badge').map(i=>{
+      const isConf = cm && i.field.toLowerCase().includes(cm) && !isNaN(i.raw);
+      const dot = isConf ? `<span class="gdot" style="background:${confColor(i.raw)}"></span>` : '';
+      const val = i.num ? fmtVal(i) : esc(i.fmt);
+      return pill(`${dot}${esc(i.label)} <span class="mono">${val}${esc(i.unit)}</span>`);
     }).join('');
 
-    const left = `<div class="h-left">${eyebrow}<div class="h-name" style="color:${cfg.textColor};font-size:${cfg.nameSize}px">${esc(v.name.fmt)}</div>${tagPills?`<div class="h-sub">${tagPills}</div>`:''}</div>`;
-    const right = `<div class="h-right"><div class="h-score" style="color:${cfg.scoreColor};font-size:${cfg.scoreSize}px">${esc(v.score.fmt)}${cfg.scoreMax?`<span class="of">${esc(cfg.scoreMax)}</span>`:''}</div>${badges?`<div class="h-badges">${badges}</div>`:''}</div>`;
+    const eyebrow = eyebrowTxt ? `<div class="h-eyebrow" style="color:${cfg.subColor};font-size:${Math.max(10,Math.round(cfg.nameSize*0.23))}px;text-transform:${cfg.eyebrowUpper?'uppercase':'none'}">${eyebrowTxt}</div>` : '';
+    const left = `<div class="h-left">${eyebrow}<div class="h-name" style="color:${cfg.textColor};font-size:${cfg.nameSize}px">${esc(v.name.fmt)}</div>${tags?`<div class="h-sub">${tags}</div>`:''}</div>`;
+    const right = `<div class="h-right"><div class="h-score" style="color:${cfg.scoreColor};font-size:${cfg.scoreSize}px">${fmtVal(v.score)}${cfg.scoreMax?`<span class="of">${esc(cfg.scoreMax)}</span>`:''}</div>${badges?`<div class="h-badges">${badges}</div>`:''}</div>`;
 
     const hdr=$('hdr');
     hdr.style.cssText=`background:${bg};border-radius:${cfg.radius}px;padding:${cfg.padding}px ${cfg.padding+8}px;font-family:${cfg.fontFamily}`;
@@ -239,6 +271,33 @@
     hdr.classList.remove('hide'); $('msg').classList.add('hide'); last=v;
   }
   function redraw(){ if(last) draw(last); }
+
+  /* ---------- field editor ---------- */
+  function buildFieldEditor(fl){
+    const box=$('fields'); if(!box) return; box.innerHTML='';
+    if(!fl.length){ box.innerHTML='<div class="muted">Fields appear here once you drop them on Metrics, Context (or Detail).</div>'; return; }
+    let firstStr=true;
+    fl.forEach(f=>{
+      const ov=cfg.fields[f.field]||{};
+      const defRole = ov.role || (f.num ? 'badge' : (firstStr?'eyebrow':'tag'));
+      if(defRole==='eyebrow') firstStr=false;
+      const row=document.createElement('div'); row.className='frow';
+      row.innerHTML=`<div class="fn">${esc(f.field)}</div>
+        <div class="fg">
+          <select class="fr">
+            <option value="badge">Badge</option><option value="eyebrow">Eyebrow</option><option value="tag">Tag</option><option value="hide">Hide</option>
+          </select>
+          <input class="fnm" type="text" placeholder="rename" value="${esc(ov.name||'')}">
+          <input class="fu" type="text" placeholder="unit" value="${esc(ov.unit||'')}">
+        </div>`;
+      row.querySelector('.fr').value = defRole;
+      const set=(p,val)=>{ cfg.fields[f.field]=cfg.fields[f.field]||{}; cfg.fields[f.field][p]=val; saveCfg(); redraw(); };
+      row.querySelector('.fr').addEventListener('change',e=>set('role',e.target.value));
+      row.querySelector('.fnm').addEventListener('input',e=>set('name',e.target.value));
+      row.querySelector('.fu').addEventListener('input',e=>set('unit',e.target.value));
+      box.appendChild(row);
+    });
+  }
 
   function buildStyles(){
     const box=$('styles'); box.innerHTML='';
