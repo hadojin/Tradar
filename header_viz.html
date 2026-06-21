@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Header (Viz)</title>
+<script src="tableau.extensions.1.latest.min.js"></script>
+<style>
+  :root{ --blue:#4E79A7; --blue-deep:#3B5E84; --ink:#2b2b2b; --muted:#7a7a7a; --line:#e6e6e6; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Segoe UI',Tahoma,sans-serif;color:var(--ink);background:#fff;display:flex;overflow:hidden}
+  #stage{flex:1;position:relative;display:flex;min-height:0}
+  #hdr{flex:1;position:relative;display:flex;align-items:center;justify-content:space-between;gap:24px;overflow:hidden}
+  #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:#fff}
+  .msg{text-align:center;color:var(--muted);font:400 13px 'Segoe UI';max-width:340px;line-height:1.55}
+  .msg b{color:var(--ink);display:block;margin-bottom:6px;font:600 14px 'Segoe UI'}
+  .msg .enc{color:var(--blue-deep);font-weight:600}
+  .hide{display:none!important}
+
+  .h-left{position:relative;z-index:2;min-width:0}
+  .h-eyebrow{font-weight:700;letter-spacing:.22em;text-transform:uppercase;margin-bottom:11px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .h-name{line-height:.98;letter-spacing:-.015em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .h-sub{margin-top:11px;display:flex;gap:8px;flex-wrap:wrap}
+  .pill{font-weight:600;padding:6px 12px;border-radius:999px;display:flex;align-items:center;gap:7px;white-space:nowrap}
+  .pill .mono{font-family:'Spline Sans Mono','Consolas',monospace}
+  .gdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .h-right{position:relative;z-index:2;text-align:right;flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end}
+  .h-score{line-height:.82;font-weight:800;letter-spacing:-.02em}
+  .h-score .of{font-weight:600;opacity:.55}
+  .h-badges{display:flex;gap:8px;margin-top:14px;justify-content:flex-end;flex-wrap:wrap}
+  .spectrum{position:absolute;left:0;right:0;bottom:0;height:4px;z-index:1;
+    background:linear-gradient(90deg,#4E79A7,#59A14F,#B07AA1,#F28E2B,#E15759)}
+
+  /* dialog panel */
+  body.dialog{display:block}
+  body.dialog #stage{display:none}
+  #panel{display:flex;flex-direction:column;height:100vh}
+  .phead{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .phead h3{font:700 13px 'Segoe UI'}
+  .phead .x{cursor:pointer;color:#999;font-size:18px;border:0;background:none}
+  .pbody{overflow-y:auto;padding:4px 14px 18px}
+  .grp{margin-top:13px}
+  .grp h4{font:700 9.5px 'Segoe UI';letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;padding-bottom:4px;border-bottom:1px dashed var(--line)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;font:500 12px 'Segoe UI';color:#333}
+  .row.col{flex-direction:column;align-items:stretch;gap:4px}
+  .row input[type=range]{width:120px}
+  .row input[type=text]{font:500 12px 'Segoe UI';padding:5px 7px;border:1px solid #cfcfcf;border-radius:5px;width:100%}
+  .row input[type=color]{width:30px;height:22px;border:1px solid #cfcfcf;border-radius:5px;padding:0;background:#fff;cursor:pointer}
+  .row select{max-width:150px;font:500 12px 'Segoe UI';padding:4px 6px;border:1px solid #cfcfcf;border-radius:5px;background:#fff;cursor:pointer}
+  .sw{position:relative;width:34px;height:19px;flex:0 0 auto;cursor:pointer}
+  .sw input{display:none}
+  .sw i{position:absolute;inset:0;background:#d2d2d2;border-radius:999px;transition:background .16s}
+  .sw i::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .16s}
+  .sw input:checked + i{background:var(--blue)}
+  .sw input:checked + i::after{transform:translateX(15px)}
+  .muted{color:var(--muted);font-size:11px;font-weight:400}
+  .styles{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:4px}
+  .styt{border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;font:600 11px 'Segoe UI';color:#555;transition:.12s}
+  .styt:hover{border-color:var(--blue)}
+  .styt.on{border-color:var(--blue);box-shadow:0 0 0 2px rgba(78,121,167,.15)}
+  .styt .sw2{display:block;height:20px;border-radius:5px;margin-bottom:5px}
+  .pfoot{flex:0 0 auto;padding:10px 14px;border-top:1px solid var(--line)}
+  .pfoot button{width:100%;font:600 13px 'Segoe UI';color:#fff;background:var(--blue);border:0;border-radius:6px;padding:10px;cursor:pointer}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="hdr" class="hide"></div>
+    <div id="msg"><div class="msg" id="msgText"><b>Loading…</b>Starting the header.</div></div>
+  </div>
+
+  <div id="panel">
+    <div class="phead"><h3>Header settings</h3><button class="x" id="pClose">&times;</button></div>
+    <div class="pbody">
+      <div class="grp"><h4>Style preset</h4><div class="styles" id="styles"></div></div>
+      <div class="grp"><h4>Background</h4>
+        <label class="row">Style <select id="hBgStyle"><option value="gradient">Gradient</option><option value="solid">Solid</option></select></label>
+        <label class="row">Colour 1 <input type="color" id="hBg1"></label>
+        <label class="row">Colour 2 <input type="color" id="hBg2"></label>
+        <label class="row">Pillar accent line <span class="sw"><input type="checkbox" id="hSpectrum"><i></i></span></label>
+      </div>
+      <div class="grp"><h4>Colours</h4>
+        <label class="row">Name / text <input type="color" id="hText"></label>
+        <label class="row">Sub / eyebrow <input type="color" id="hSub"></label>
+        <label class="row">Score <input type="color" id="hScoreColor"></label>
+        <label class="row">Badge background <input type="color" id="hBadgeBg"></label>
+        <label class="row">Badge text <input type="color" id="hBadgeText"></label>
+      </div>
+      <div class="grp"><h4>Sizes &amp; layout</h4>
+        <div class="row col"><span>Name size <span class="muted" id="hNameSizeV"></span></span><input type="range" id="hNameSize" min="20" max="72" step="1"></div>
+        <div class="row col"><span>Score size <span class="muted" id="hScoreSizeV"></span></span><input type="range" id="hScoreSize" min="36" max="130" step="2"></div>
+        <div class="row col"><span>Padding <span class="muted" id="hPadV"></span></span><input type="range" id="hPad" min="14" max="56" step="2"></div>
+        <div class="row col"><span>Corner radius <span class="muted" id="hRadiusV"></span></span><input type="range" id="hRadius" min="0" max="32" step="1"></div>
+        <label class="row">Score side <select id="hScoreSide"><option value="right">Right</option><option value="left">Left</option></select></label>
+        <label class="row">Font <select id="hFont">
+          <option value="'Segoe UI', Tahoma, sans-serif">Segoe UI</option>
+          <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+          <option value="'Benton Sans','Segoe UI',sans-serif">Benton Sans</option>
+          <option value="Arial, Helvetica, sans-serif">Arial</option></select></label>
+      </div>
+      <div class="grp"><h4>Labels</h4>
+        <label class="row">Score suffix <input type="text" id="hScoreMax" style="max-width:80px" placeholder="/100"></label>
+        <label class="row">Rank label <input type="text" id="hRankLabel" style="max-width:90px" placeholder="Rank"></label>
+        <label class="row">Rank suffix <input type="text" id="hRankSuffix" style="max-width:90px" placeholder="of 25"></label>
+        <label class="row">Confidence label <input type="text" id="hConfLabel" style="max-width:100px" placeholder="Confidence"></label>
+        <label class="row">Confidence dot <span class="sw"><input type="checkbox" id="hConfDot"><i></i></span></label>
+        <label class="row">Eyebrow UPPERCASE <span class="sw"><input type="checkbox" id="hDateUpper"><i></i></span></label>
+      </div>
+    </div>
+    <div class="pfoot" id="pfoot" style="display:none"><button id="pDone">Done</button></div>
+  </div>
+
+<script>
+"use strict";
+(function(){
+  const $ = id => document.getElementById(id);
+  const DIALOG = new URLSearchParams(location.search).get('dialog')==='1';
+  let worksheet=null, last=null;
+
+  const RANGES = [['hNameSize','nameSize','px'],['hScoreSize','scoreSize','px'],['hPad','padding','px'],['hRadius','radius','px']];
+  const COLORS = [['hBg1','bg1'],['hBg2','bg2'],['hText','textColor'],['hSub','subColor'],['hScoreColor','scoreColor'],['hBadgeBg','badgeBg'],['hBadgeText','badgeText']];
+  const SELECTS= [['hBgStyle','bgStyle'],['hScoreSide','scoreSide'],['hFont','fontFamily']];
+  const TOGGLES= [['hSpectrum','spectrum'],['hConfDot','confDot'],['hDateUpper','dateUpper']];
+  const TEXTS  = [['hScoreMax','scoreMax'],['hRankLabel','rankLabel'],['hRankSuffix','rankSuffix'],['hConfLabel','confLabel']];
+
+  const PRESETS = {
+    'Navy gold':{sw:'linear-gradient(135deg,#0C1E36,#102845)',o:{bgStyle:'gradient',bg1:'#0C1E36',bg2:'#102845',textColor:'#ffffff',subColor:'#E7D5A8',scoreColor:'#C9A227',badgeBg:'#1b3454',badgeText:'#dfe6f0',spectrum:true}},
+    'Navy white':{sw:'linear-gradient(135deg,#13294d,#0e1f3b)',o:{bgStyle:'gradient',bg1:'#13294d',bg2:'#0e1f3b',textColor:'#ffffff',subColor:'#9fb0c6',scoreColor:'#ffffff',badgeBg:'#1e3a56',badgeText:'#dfe6f0',spectrum:false}},
+    'Slate':{sw:'linear-gradient(135deg,#27313b,#1a222b)',o:{bgStyle:'gradient',bg1:'#27313b',bg2:'#1a222b',textColor:'#f1f4f7',subColor:'#9fb0bd',scoreColor:'#7FB8D6',badgeBg:'#34404c',badgeText:'#e3eaef',spectrum:true}},
+    'Light':{sw:'#ffffff',o:{bgStyle:'solid',bg1:'#ffffff',bg2:'#ffffff',textColor:'#16294f',subColor:'#8A6417',scoreColor:'#B5872A',badgeBg:'#f1f0ea',badgeText:'#16294f',spectrum:true}},
+    'Ink':{sw:'linear-gradient(135deg,#14151a,#0c0d11)',o:{bgStyle:'gradient',bg1:'#14151a',bg2:'#0c0d11',textColor:'#f4f4f5',subColor:'#C9A227',scoreColor:'#C9A227',badgeBg:'#23242b',badgeText:'#e6e6e8',spectrum:false}},
+  };
+
+  const DEFAULTS = {
+    preset:'Navy gold', bgStyle:'gradient', bg1:'#0C1E36', bg2:'#102845', spectrum:true,
+    textColor:'#ffffff', subColor:'#E7D5A8', scoreColor:'#C9A227', badgeBg:'#1b3454', badgeText:'#dfe6f0',
+    nameSize:46, scoreSize:84, padding:30, radius:18, scoreSide:'right',
+    fontFamily:"'Segoe UI', Tahoma, sans-serif",
+    scoreMax:'/100', rankLabel:'Rank', rankSuffix:'', confLabel:'Confidence', confDot:true, dateUpper:true
+  };
+  let cfg = JSON.parse(JSON.stringify(DEFAULTS));
+
+  function loadCfg(){ try{ const r=tableau.extensions.settings.get('hdrCfg'); if(r) cfg={...JSON.parse(JSON.stringify(DEFAULTS)),...JSON.parse(r)}; }catch(_){} }
+  let saveT=null;
+  function saveCfg(){ try{ tableau.extensions.settings.set('hdrCfg', JSON.stringify(cfg));
+    clearTimeout(saveT); saveT=setTimeout(()=>{ try{ tableau.extensions.settings.saveAsync(); }catch(_){} },250); }catch(_){} }
+
+  if (DIALOG) initDialog(); else initViz();
+
+  function initViz(){
+    tableau.extensions.initializeAsync({ configure: openConfig }).then(()=>{
+      worksheet = tableau.extensions.worksheetContent.worksheet;
+      loadCfg();
+      worksheet.addEventListener(tableau.TableauEventType.SummaryDataChanged, render);
+      try{ tableau.extensions.settings.addEventListener(tableau.TableauEventType.SettingsChanged, ()=>{ loadCfg(); redraw(); }); }catch(_){}
+      render();
+    }).catch(e=>showMsg('Couldn’t start', esc(String(e&&e.message||e))));
+  }
+  function openConfig(){
+    const url = location.href.split('#')[0].split('?')[0] + '?dialog=1';
+    let style; try{ style=tableau.DialogStyle.Modeless; }catch(_){ style='modeless'; }
+    try{ tableau.extensions.ui.displayDialogAsync(url,'x',{width:316,height:660,dialogStyle:style}).then(()=>{}).catch(()=>{}); }catch(_){}
+  }
+  function initDialog(){
+    document.body.classList.add('dialog');
+    tableau.extensions.initializeDialogAsync().then(()=>{
+      loadCfg(); buildStyles(); bindControls(); syncControls();
+      $('pfoot').style.display='block';
+      const done=()=>{ try{ tableau.extensions.ui.closeDialog('done'); }catch(_){} };
+      $('pDone').onclick=done; $('pClose').onclick=done;
+    }).catch(e=>{ $('msgText').innerHTML='<b>Dialog error</b>'+esc(String(e&&e.message||e)); });
+  }
+
+  /* render */
+  async function render(){
+    if(!worksheet) return;
+    try{
+      const spec = await worksheet.getVisualSpecificationAsync();
+      const marks = spec.marksSpecifications[spec.activeMarksSpecificationIndex];
+      const fieldBy={};
+      (marks.encodings||[]).forEach(enc=>{ const f=enc.field||(enc.fields&&enc.fields[0]); if(f) fieldBy[enc.id]=f.name; });
+      const dt = await fetchTable(worksheet);
+      if(!dt.data.length) return showMsg('No data','Filter the sheet to one agent.');
+      const row = dt.data[0];
+      const get = id=>{ const fn=fieldBy[id]; if(!fn) return null; const ci=dt.columns.findIndex(c=>c.fieldName===fn); if(ci<0) return null;
+        const cell=row[ci]; const raw=typeof cell.value==='number'?cell.value:parseFloat(cell.formattedValue); return { fmt:cell.formattedValue, raw }; };
+      const vals = { name:get('name'), score:get('score'), rank:get('rank'), conf:get('confidence'), team:get('team'), date:get('date') };
+      if(!vals.name || !vals.score) return showMsg('Assign Name &amp; Score','Put a dimension on <span class="enc">Name</span> and a measure on <span class="enc">Score</span>. Rank, Confidence, Date &amp; Team are optional.');
+      draw(vals);
+    }catch(e){ showMsg('Error', esc(String(e&&e.message||e))); }
+  }
+  async function fetchTable(ws){
+    if(ws.getSummaryDataReaderAsync){ const rd=await ws.getSummaryDataReaderAsync(undefined,{ignoreSelection:true}); const dt=await rd.getAllPagesAsync(); await rd.releaseAsync(); return dt; }
+    return await ws.getSummaryDataAsync({maxRows:50,ignoreSelection:true});
+  }
+
+  /* draw */
+  function confColor(v){ return v>=80?'#3F8F63':v>=50?'#C9A227':'#C2410C'; }
+  function pill(html){ return `<span class="pill" style="background:${cfg.badgeBg};color:${cfg.badgeText}">${html}</span>`; }
+  function draw(v){
+    const bg = cfg.bgStyle==='gradient' ? `linear-gradient(135deg,${cfg.bg1},${cfg.bg2})` : cfg.bg1;
+    const eyebrowBits=[];
+    if(v.date) eyebrowBits.push(esc(v.date.fmt));
+    const eyebrow = eyebrowBits.length ? `<div class="h-eyebrow" style="color:${cfg.subColor};font-size:${Math.max(10,cfg.nameSize*0.23)}px${cfg.dateUpper?'':';text-transform:none'}">${eyebrowBits.join(' · ')}</div>` : '';
+    const teamPill = v.team ? pill(`Team · <b class="mono">${esc(v.team.fmt)}</b>`) : '';
+    const rankPill = v.rank ? pill(`${esc(cfg.rankLabel)} <span class="mono">${esc(v.rank.fmt)}${cfg.rankSuffix?' '+esc(cfg.rankSuffix):''}</span>`) : '';
+    const confPill = v.conf ? pill(`${cfg.confDot?`<span class="gdot" style="background:${confColor(v.conf.raw)}"></span>`:''}${esc(cfg.confLabel)} <span class="mono">${esc(v.conf.fmt)}</span>`) : '';
+
+    const left = `<div class="h-left">
+        ${eyebrow}
+        <div class="h-name" style="color:${cfg.textColor};font-size:${cfg.nameSize}px">${esc(v.name.fmt)}</div>
+        ${teamPill?`<div class="h-sub">${teamPill}</div>`:''}
+      </div>`;
+    const right = `<div class="h-right">
+        <div class="h-score" style="color:${cfg.scoreColor};font-size:${cfg.scoreSize}px">${esc(v.score.fmt)}${cfg.scoreMax?`<span class="of">${esc(cfg.scoreMax)}</span>`:''}</div>
+        ${(rankPill||confPill)?`<div class="h-badges">${rankPill}${confPill}</div>`:''}
+      </div>`;
+
+    const hdr=$('hdr');
+    hdr.style.cssText=`background:${bg};border-radius:${cfg.radius}px;padding:${cfg.padding}px ${cfg.padding+8}px;font-family:${cfg.fontFamily}`;
+    hdr.innerHTML = (cfg.scoreSide==='left' ? right+left : left+right) + (cfg.spectrum?'<div class="spectrum"></div>':'');
+    hdr.classList.remove('hide'); $('msg').classList.add('hide');
+    last=v;
+  }
+  function redraw(){ if(last) draw(last); }
+
+  /* dialog controls */
+  function buildStyles(){
+    const box=$('styles'); box.innerHTML='';
+    Object.keys(PRESETS).forEach(name=>{ const p=PRESETS[name]; const el=document.createElement('div');
+      el.className='styt'+(cfg.preset===name?' on':'');
+      el.innerHTML=`<span class="sw2" style="background:${p.sw}"></span>${name}`;
+      el.onclick=()=>applyPreset(name); box.appendChild(el); });
+  }
+  function applyPreset(name){ const p=PRESETS[name]; if(!p)return; Object.assign(cfg,p.o); cfg.preset=name;
+    [...document.querySelectorAll('.styt')].forEach(s=>s.classList.toggle('on', s.textContent.trim()===name));
+    syncControls(); saveCfg(); redraw(); }
+  function bindControls(){
+    RANGES.forEach(([id,k,suf])=>$(id).addEventListener('input',e=>{cfg[k]=+e.target.value;const v=$(id+'V');if(v)v.textContent=e.target.value+suf;saveCfg();redraw();}));
+    COLORS.forEach(([id,k])=>$(id).addEventListener('input',e=>{cfg[k]=e.target.value;saveCfg();redraw();}));
+    SELECTS.forEach(([id,k])=>$(id).addEventListener('change',e=>{cfg[k]=e.target.value;saveCfg();redraw();}));
+    TOGGLES.forEach(([id,k])=>$(id).addEventListener('change',e=>{cfg[k]=e.target.checked;saveCfg();redraw();}));
+    TEXTS.forEach(([id,k])=>$(id).addEventListener('input',e=>{cfg[k]=e.target.value;saveCfg();redraw();}));
+  }
+  function syncControls(){
+    RANGES.forEach(([id,k,suf])=>{const el=$(id);if(el){el.value=cfg[k];const v=$(id+'V');if(v)v.textContent=cfg[k]+suf;}});
+    COLORS.forEach(([id,k])=>{const el=$(id);if(el)el.value=cfg[k];});
+    SELECTS.forEach(([id,k])=>{const el=$(id);if(el)el.value=cfg[k];});
+    TOGGLES.forEach(([id,k])=>{const el=$(id);if(el)el.checked=cfg[k];});
+    TEXTS.forEach(([id,k])=>{const el=$(id);if(el)el.value=cfg[k];});
+  }
+
+  function showMsg(t,b){ const h=$('hdr'); if(h)h.classList.add('hide'); $('msg').classList.remove('hide'); $('msgText').innerHTML='<b>'+t+'</b>'+(b||''); }
+  function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+})();
+</script>
+</body>
+</html>
