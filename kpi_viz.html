@@ -25,16 +25,21 @@
   .tile .num{line-height:1;font-weight:700}
   .tile .num .pre,.tile .num .suf{font-size:.5em;font-weight:600;opacity:.65}
 
-  /* panel — full page inside the Configure dialog */
+  /* panel — dialog only */
   body.dialog{display:block}
   body.dialog #stage{display:none}
-  #panel{display:flex;flex-direction:column;height:100vh}
+  #panel{display:none}
+  body.dialog #panel{display:flex;flex-direction:column;height:100vh}
   .phead{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line);flex:0 0 auto}
   .phead h3{font:700 13px 'Segoe UI'}
   .phead .x{cursor:pointer;color:#999;font-size:18px;border:0;background:none}
-  .pbody{overflow-y:auto;padding:4px 14px 18px;flex:1 1 auto}
-  .grp{margin-top:13px}
-  .grp h4{font:700 9.5px 'Segoe UI';letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;padding-bottom:4px;border-bottom:1px dashed var(--line)}
+  .tabs{display:flex;gap:1px;padding:7px 8px 0;border-bottom:1px solid var(--line);flex:0 0 auto;overflow-x:auto}
+  .tabs button{font:600 11px 'Segoe UI';color:#888;background:none;border:0;padding:8px 9px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+  .tabs button.on{color:var(--blue-deep);border-bottom-color:var(--blue)}
+  .pbody{overflow-y:auto;padding:8px 14px 18px;flex:1 1 auto}
+  .tab{display:none} .tab.on{display:block}
+  .grp{margin-top:6px}
+  .grp h4{font:700 9.5px 'Segoe UI';letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;padding-bottom:4px;border-bottom:1px dashed var(--line)}
   .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;font:500 12px 'Segoe UI';color:#333}
   .row.col{flex-direction:column;align-items:stretch;gap:4px}
   .row input[type=range]{width:120px}
@@ -49,7 +54,7 @@
   .sw input:checked + i{background:var(--blue)}
   .sw input:checked + i::after{transform:translateX(15px)}
   .muted{color:var(--muted);font-size:11px;font-weight:400}
-  .styles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px}
+  .styles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
   .styt{border:1px solid var(--line);border-radius:8px;padding:8px 4px;text-align:center;cursor:pointer;font:600 11px 'Segoe UI';color:#555;background:#fff;transition:.12s}
   .styt:hover{border-color:var(--blue)}
   .styt.on{border-color:var(--blue);background:#eef3f8;color:var(--blue-deep);box-shadow:0 0 0 2px rgba(78,121,167,.15)}
@@ -61,7 +66,6 @@
   .trow input{font:500 11px 'Segoe UI';padding:4px 6px;border:1px solid #d6d6d6;border-radius:4px;width:100%}
   .pfoot{flex:0 0 auto;padding:10px 14px;border-top:1px solid var(--line)}
   .pfoot button{width:100%;font:600 13px 'Segoe UI';color:#fff;background:var(--blue);border:0;border-radius:6px;padding:10px;cursor:pointer}
-  .pfoot button:hover{background:var(--blue-deep)}
 </style>
 </head>
 <body>
@@ -72,9 +76,18 @@
 
   <div id="panel">
     <div class="phead"><h3>KPI settings</h3><button class="x" id="pClose">&times;</button></div>
+    <div class="tabs" id="tabs">
+      <button class="on" data-t="style">Style</button>
+      <button data-t="layout">Layout</button>
+      <button data-t="text">Text</button>
+      <button data-t="colour">Colour</button>
+      <button data-t="format">Format</button>
+      <button data-t="tiles">Tiles</button>
+    </div>
     <div class="pbody">
-      <div class="grp"><h4>Style preset</h4><div class="styles" id="styles"></div></div>
-      <div class="grp"><h4>Layout</h4>
+      <div class="tab on" id="t-style"><div class="grp"><h4>Style preset</h4><div class="styles" id="styles"></div></div></div>
+
+      <div class="tab" id="t-layout"><div class="grp"><h4>Layout</h4>
         <label class="row">Columns <select id="kColumns"><option value="auto">Auto-fit</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
         <div class="row col"><span>Min tile width <span class="muted" id="kMinWV"></span></span><input type="range" id="kMinW" min="90" max="320" step="10"></div>
         <div class="row col"><span>Gap <span class="muted" id="kGapV"></span></span><input type="range" id="kGap" min="0" max="28" step="1"></div>
@@ -82,8 +95,9 @@
         <div class="row col"><span>Corner radius <span class="muted" id="kRadiusV"></span></span><input type="range" id="kRadius" min="0" max="22" step="1"></div>
         <div class="row col"><span>Min height <span class="muted" id="kMinHV"></span></span><input type="range" id="kMinH" min="56" max="200" step="4"></div>
         <label class="row">Align <select id="kAlign"><option value="left">Left</option><option value="center">Center</option></select></label>
-      </div>
-      <div class="grp"><h4>Typography</h4>
+      </div></div>
+
+      <div class="tab" id="t-text"><div class="grp"><h4>Typography</h4>
         <label class="row">Font <select id="kFont">
           <option value="'Segoe UI', Tahoma, sans-serif">Segoe UI</option>
           <option value="'Benton Sans','Segoe UI',sans-serif">Benton Sans</option>
@@ -93,25 +107,28 @@
         <div class="row col"><span>Number size <span class="muted" id="kNumSizeV"></span></span><input type="range" id="kNumSize" min="16" max="60" step="1"></div>
         <div class="row col"><span>Label size <span class="muted" id="kLabelSizeV"></span></span><input type="range" id="kLabelSize" min="8" max="18" step="1"></div>
         <label class="row">Label case <select id="kLabelCase"><option value="upper">UPPERCASE</option><option value="none">As-is</option><option value="title">Title</option></select></label>
-      </div>
-      <div class="grp"><h4>Colours</h4>
+      </div></div>
+
+      <div class="tab" id="t-colour"><div class="grp"><h4>Colours</h4>
         <label class="row">Number <input type="color" id="kNumColor"></label>
         <label class="row">Label <input type="color" id="kLabelColor"></label>
         <label class="row">Tile background <input type="color" id="kTileBg"></label>
         <label class="row">Border <input type="color" id="kBorder"></label>
         <label class="row">Default accent <input type="color" id="kAccent"></label>
         <label class="row">Accent style <select id="kAccentStyle"><option value="left">Left bar</option><option value="top">Top bar</option><option value="dot">Dot</option><option value="none">None</option></select></label>
-      </div>
-      <div class="grp"><h4>Number format</h4>
+      </div></div>
+
+      <div class="tab" id="t-format"><div class="grp"><h4>Number format</h4>
         <label class="row">Decimals <select id="kDecimals"><option value="tableau">Use Tableau</option><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
         <label class="row">Thousands separator <span class="sw"><input type="checkbox" id="kThousands"><i></i></span></label>
         <label class="row">Prefix <input type="text" id="kPrefix" style="max-width:90px" placeholder="$"></label>
         <label class="row">Suffix <input type="text" id="kSuffix" style="max-width:90px" placeholder="%"></label>
-      </div>
-      <div class="grp"><h4>Per-tile</h4>
+      </div></div>
+
+      <div class="tab" id="t-tiles"><div class="grp"><h4>Per-tile</h4>
         <div class="muted" style="margin-bottom:6px">Rename, set a unit, decimals &amp; colour for each measure.</div>
         <div id="tiles"></div>
-      </div>
+      </div></div>
     </div>
     <div class="pfoot" id="pfoot" style="display:none"><button id="pDone">Done</button></div>
   </div>
@@ -128,14 +145,13 @@
   const COLORS  = [['kNumColor','numColor'],['kLabelColor','labelColor'],['kTileBg','tileBg'],['kBorder','borderColor'],['kAccent','accentColor']];
   const SELECTS = [['kColumns','columns'],['kAlign','align'],['kFont','fontFamily'],['kLabelCase','labelCase'],['kAccentStyle','accentStyle'],['kDecimals','decimals']];
 
-  /* ---- 6 preset styles (the look bundle; per-tile colours/data untouched) ---- */
   const PRESETS = {
-    Card:     {sw:'#fff',                                    o:{tileBg:'#ffffff',borderColor:'#e6e8ee',accentColor:'#4E79A7',accentStyle:'left',numColor:'#16294f',labelColor:'#7a869a',radius:13,padding:14,numSize:32,labelSize:11,minHeight:92}},
-    Minimal:  {sw:'#fff',                                    o:{tileBg:'#ffffff',borderColor:'#ffffff',accentColor:'#4E79A7',accentStyle:'none',numColor:'#1d2b3a',labelColor:'#9aa3b0',radius:8, padding:12,numSize:34,labelSize:10,minHeight:84}},
-    Outline:  {sw:'#fff',                                    o:{tileBg:'#ffffff',borderColor:'#16294f',accentColor:'#16294f',accentStyle:'none',numColor:'#16294f',labelColor:'#5a6b7d',radius:10,padding:14,numSize:30,labelSize:11,minHeight:90}},
+    Card:     {sw:'#fff',                                     o:{tileBg:'#ffffff',borderColor:'#e6e8ee',accentColor:'#4E79A7',accentStyle:'left',numColor:'#16294f',labelColor:'#7a869a',radius:13,padding:14,numSize:32,labelSize:11,minHeight:92}},
+    Minimal:  {sw:'#fff',                                     o:{tileBg:'#ffffff',borderColor:'#ffffff',accentColor:'#4E79A7',accentStyle:'none',numColor:'#1d2b3a',labelColor:'#9aa3b0',radius:8, padding:12,numSize:34,labelSize:10,minHeight:84}},
+    Outline:  {sw:'#fff',                                     o:{tileBg:'#ffffff',borderColor:'#16294f',accentColor:'#16294f',accentStyle:'none',numColor:'#16294f',labelColor:'#5a6b7d',radius:10,padding:14,numSize:30,labelSize:11,minHeight:90}},
     'Bold dark':{sw:'linear-gradient(180deg,#16294f,#0e1d36)',o:{tileBg:'#16294f',borderColor:'#16294f',accentColor:'#C9A227',accentStyle:'top', numColor:'#ffffff',labelColor:'#9fb0c6',radius:12,padding:15,numSize:34,labelSize:10,minHeight:96}},
-    Pastel:   {sw:'#eef2f8',                                 o:{tileBg:'#f5f7fb',borderColor:'#e7ecf4',accentColor:'#4E79A7',accentStyle:'dot', numColor:'#27384c',labelColor:'#8893a4',radius:16,padding:15,numSize:31,labelSize:11,minHeight:94}},
-    Compact:  {sw:'#fff',                                    o:{tileBg:'#ffffff',borderColor:'#eceef2',accentColor:'#4E79A7',accentStyle:'top', numColor:'#16294f',labelColor:'#8893a4',radius:8, padding:9, numSize:22,labelSize:9, minHeight:62}},
+    Pastel:   {sw:'#eef2f8',                                  o:{tileBg:'#f5f7fb',borderColor:'#e7ecf4',accentColor:'#4E79A7',accentStyle:'dot', numColor:'#27384c',labelColor:'#8893a4',radius:16,padding:15,numSize:31,labelSize:11,minHeight:94}},
+    Compact:  {sw:'#fff',                                     o:{tileBg:'#ffffff',borderColor:'#eceef2',accentColor:'#4E79A7',accentStyle:'top', numColor:'#16294f',labelColor:'#8893a4',radius:8, padding:9, numSize:22,labelSize:9, minHeight:62}},
   };
 
   const DEFAULTS = {
@@ -151,10 +167,8 @@
   function saveCfg(){ try{ tableau.extensions.settings.set('kpiCfg', JSON.stringify(cfg));
     clearTimeout(saveT); saveT=setTimeout(()=>{ try{ tableau.extensions.settings.saveAsync(); }catch(_){} }, 250); }catch(_){} }
 
-  /* ================= entry ================= */
   if (DIALOG) initDialog(); else initViz();
 
-  /* ---- viz: renders tiles, opens the native Configure dialog ---- */
   function initViz(){
     tableau.extensions.initializeAsync({ configure: openConfig }).then(()=>{
       worksheet = tableau.extensions.worksheetContent.worksheet;
@@ -167,14 +181,12 @@
   function openConfig(){
     const url = location.href.split('#')[0].split('?')[0] + '?dialog=1';
     let style; try{ style = tableau.DialogStyle.Modeless; }catch(_){ style='modeless'; }
-    try{ tableau.extensions.ui.displayDialogAsync(url, 'x', { width:312, height:660, dialogStyle:style }).then(()=>{}).catch(()=>{}); }catch(_){}
+    try{ tableau.extensions.ui.displayDialogAsync(url, 'x', { width:320, height:560, dialogStyle:style }).then(()=>{}).catch(()=>{}); }catch(_){}
   }
-
-  /* ---- dialog: the settings panel (writes settings the viz listens to) ---- */
   function initDialog(){
     document.body.classList.add('dialog');
     tableau.extensions.initializeDialogAsync().then(()=>{
-      loadCfg(); buildStyles(); bindControls(); syncControls();
+      loadCfg(); buildStyles(); bindControls(); syncControls(); initTabs();
       let fields=[]; try{ fields=JSON.parse(tableau.extensions.settings.get('kpiFields')||'[]'); }catch(_){}
       buildTileEditor(fields);
       $('pfoot').style.display='block';
@@ -182,8 +194,12 @@
       $('pDone').onclick=done; $('pClose').onclick=done;
     }).catch(e=>{ $('msgText').innerHTML='<b>Dialog error</b>'+esc(String(e&&e.message||e)); });
   }
+  function initTabs(){
+    const btns=[...document.querySelectorAll('#tabs button')];
+    btns.forEach(b=>b.onclick=()=>{ btns.forEach(x=>x.classList.toggle('on',x===b));
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.id==='t-'+b.dataset.t)); });
+  }
 
-  /* ================= render ================= */
   async function render(){
     if(!worksheet) return;
     try{
@@ -196,21 +212,16 @@
           if(!isNaN(num)){ sum+=num; nn++; if(fmt===null) fmt=cell.formattedValue; } });
         return { field:c.fieldName, raw: nn? sum/nn : 0, fmt: fmt!==null?fmt:'—' };
       });
-      // expose the field list so the Configure dialog can build its per-tile editor
       const sig = kpis.map(k=>k.field).join('|');
       if(sig!==lastSig){ lastSig=sig; try{ tableau.extensions.settings.set('kpiFields', JSON.stringify(kpis.map(k=>k.field))); tableau.extensions.settings.saveAsync(); }catch(_){} }
       drawTiles(kpis);
     }catch(e){ showMsg('Error', esc(String(e&&e.message||e))); }
   }
   async function fetchTable(ws){
-    if(ws.getSummaryDataReaderAsync){
-      const reader = await ws.getSummaryDataReaderAsync(undefined,{ignoreSelection:true});
-      const dt = await reader.getAllPagesAsync(); await reader.releaseAsync(); return dt;
-    }
+    if(ws.getSummaryDataReaderAsync){ const reader=await ws.getSummaryDataReaderAsync(undefined,{ignoreSelection:true}); const dt=await reader.getAllPagesAsync(); await reader.releaseAsync(); return dt; }
     return await ws.getSummaryDataAsync({maxRows:5000,ignoreSelection:true});
   }
 
-  /* ================= formatting + draw ================= */
   function fmtNum(raw,dec,th){ let s=(+raw).toFixed(dec); if(th) s=s.replace(/\B(?=(\d{3})+(?!\d))/g,','); return s; }
   function labelCase(s){ if(cfg.labelCase==='upper')return s.toUpperCase(); if(cfg.labelCase==='title')return s.replace(/\w\S*/g,w=>w[0].toUpperCase()+w.slice(1).toLowerCase()); return s; }
   function resolveTile(k){
@@ -245,23 +256,16 @@
   }
   function redraw(){ if(lastKpis) drawTiles(lastKpis); }
 
-  /* ================= dialog controls ================= */
   function buildStyles(){
     const box=$('styles'); box.innerHTML='';
-    Object.keys(PRESETS).forEach(name=>{
-      const p=PRESETS[name]; const el=document.createElement('div');
+    Object.keys(PRESETS).forEach(name=>{ const p=PRESETS[name]; const el=document.createElement('div');
       el.className='styt'+(cfg.preset===name?' on':'');
       el.innerHTML=`<span class="sw2" style="background:${p.sw};border:1px solid #e0e0e0"></span>${name}`;
-      el.onclick=()=>{ applyPreset(name); };
-      box.appendChild(el);
-    });
+      el.onclick=()=>applyPreset(name); box.appendChild(el); });
   }
-  function applyPreset(name){
-    const p=PRESETS[name]; if(!p) return;
-    Object.assign(cfg, p.o); cfg.preset=name;
+  function applyPreset(name){ const p=PRESETS[name]; if(!p)return; Object.assign(cfg,p.o); cfg.preset=name;
     [...document.querySelectorAll('.styt')].forEach(s=>s.classList.toggle('on', s.textContent.trim()===name));
-    syncControls(); saveCfg(); redraw();
-  }
+    syncControls(); saveCfg(); redraw(); }
   function bindControls(){
     TOGGLES.forEach(([id,k])=>$(id).addEventListener('change',e=>{cfg[k]=e.target.checked;saveCfg();redraw();}));
     RANGES.forEach(([id,k,suf])=>$(id).addEventListener('input',e=>{cfg[k]=+e.target.value;const v=$(id+'V');if(v)v.textContent=e.target.value+suf;saveCfg();redraw();}));
@@ -298,7 +302,6 @@
     });
   }
 
-  /* ================= utils ================= */
   function showMsg(t,b){ const g=$('grid'); if(g)g.classList.add('hide'); $('msg').classList.remove('hide'); $('msgText').innerHTML='<b>'+esc(t)+'</b>'+(b||''); }
   function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 })();

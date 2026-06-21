@@ -29,19 +29,23 @@
   .h-score{line-height:.82;font-weight:800;letter-spacing:-.02em}
   .h-score .of{font-weight:600;opacity:.55}
   .h-badges{display:flex;gap:8px;margin-top:14px;justify-content:flex-end;flex-wrap:wrap}
-  .spectrum{position:absolute;left:0;right:0;bottom:0;height:4px;z-index:1;
-    background:linear-gradient(90deg,#4E79A7,#59A14F,#B07AA1,#F28E2B,#E15759)}
+  .spectrum{position:absolute;left:0;right:0;bottom:0;height:4px;z-index:1;background:linear-gradient(90deg,#4E79A7,#59A14F,#B07AA1,#F28E2B,#E15759)}
 
-  /* dialog panel */
+  /* panel — dialog only */
   body.dialog{display:block}
   body.dialog #stage{display:none}
-  #panel{display:flex;flex-direction:column;height:100vh}
-  .phead{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line)}
+  #panel{display:none}
+  body.dialog #panel{display:flex;flex-direction:column;height:100vh}
+  .phead{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line);flex:0 0 auto}
   .phead h3{font:700 13px 'Segoe UI'}
   .phead .x{cursor:pointer;color:#999;font-size:18px;border:0;background:none}
-  .pbody{overflow-y:auto;padding:4px 14px 18px}
-  .grp{margin-top:13px}
-  .grp h4{font:700 9.5px 'Segoe UI';letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;padding-bottom:4px;border-bottom:1px dashed var(--line)}
+  .tabs{display:flex;gap:1px;padding:7px 8px 0;border-bottom:1px solid var(--line);flex:0 0 auto;overflow-x:auto}
+  .tabs button{font:600 11px 'Segoe UI';color:#888;background:none;border:0;padding:8px 9px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+  .tabs button.on{color:var(--blue-deep);border-bottom-color:var(--blue)}
+  .pbody{overflow-y:auto;padding:8px 14px 18px;flex:1 1 auto}
+  .tab{display:none} .tab.on{display:block}
+  .grp{margin-top:6px}
+  .grp h4{font:700 9.5px 'Segoe UI';letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;padding-bottom:4px;border-bottom:1px dashed var(--line)}
   .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;font:500 12px 'Segoe UI';color:#333}
   .row.col{flex-direction:column;align-items:stretch;gap:4px}
   .row input[type=range]{width:120px}
@@ -55,7 +59,7 @@
   .sw input:checked + i{background:var(--blue)}
   .sw input:checked + i::after{transform:translateX(15px)}
   .muted{color:var(--muted);font-size:11px;font-weight:400}
-  .styles{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:4px}
+  .styles{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
   .styt{border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;font:600 11px 'Segoe UI';color:#555;transition:.12s}
   .styt:hover{border-color:var(--blue)}
   .styt.on{border-color:var(--blue);box-shadow:0 0 0 2px rgba(78,121,167,.15)}
@@ -72,22 +76,32 @@
 
   <div id="panel">
     <div class="phead"><h3>Header settings</h3><button class="x" id="pClose">&times;</button></div>
+    <div class="tabs" id="tabs">
+      <button class="on" data-t="style">Style</button>
+      <button data-t="bg">Background</button>
+      <button data-t="colour">Colour</button>
+      <button data-t="layout">Layout</button>
+      <button data-t="labels">Labels</button>
+    </div>
     <div class="pbody">
-      <div class="grp"><h4>Style preset</h4><div class="styles" id="styles"></div></div>
-      <div class="grp"><h4>Background</h4>
+      <div class="tab on" id="t-style"><div class="grp"><h4>Style preset</h4><div class="styles" id="styles"></div></div></div>
+
+      <div class="tab" id="t-bg"><div class="grp"><h4>Background</h4>
         <label class="row">Style <select id="hBgStyle"><option value="gradient">Gradient</option><option value="solid">Solid</option></select></label>
         <label class="row">Colour 1 <input type="color" id="hBg1"></label>
         <label class="row">Colour 2 <input type="color" id="hBg2"></label>
         <label class="row">Pillar accent line <span class="sw"><input type="checkbox" id="hSpectrum"><i></i></span></label>
-      </div>
-      <div class="grp"><h4>Colours</h4>
+      </div></div>
+
+      <div class="tab" id="t-colour"><div class="grp"><h4>Colours</h4>
         <label class="row">Name / text <input type="color" id="hText"></label>
         <label class="row">Sub / eyebrow <input type="color" id="hSub"></label>
         <label class="row">Score <input type="color" id="hScoreColor"></label>
         <label class="row">Badge background <input type="color" id="hBadgeBg"></label>
         <label class="row">Badge text <input type="color" id="hBadgeText"></label>
-      </div>
-      <div class="grp"><h4>Sizes &amp; layout</h4>
+      </div></div>
+
+      <div class="tab" id="t-layout"><div class="grp"><h4>Sizes &amp; layout</h4>
         <div class="row col"><span>Name size <span class="muted" id="hNameSizeV"></span></span><input type="range" id="hNameSize" min="20" max="72" step="1"></div>
         <div class="row col"><span>Score size <span class="muted" id="hScoreSizeV"></span></span><input type="range" id="hScoreSize" min="36" max="130" step="2"></div>
         <div class="row col"><span>Padding <span class="muted" id="hPadV"></span></span><input type="range" id="hPad" min="14" max="56" step="2"></div>
@@ -98,15 +112,16 @@
           <option value="Georgia, 'Times New Roman', serif">Georgia</option>
           <option value="'Benton Sans','Segoe UI',sans-serif">Benton Sans</option>
           <option value="Arial, Helvetica, sans-serif">Arial</option></select></label>
-      </div>
-      <div class="grp"><h4>Labels</h4>
+      </div></div>
+
+      <div class="tab" id="t-labels"><div class="grp"><h4>Labels</h4>
         <label class="row">Score suffix <input type="text" id="hScoreMax" style="max-width:80px" placeholder="/100"></label>
         <label class="row">Rank label <input type="text" id="hRankLabel" style="max-width:90px" placeholder="Rank"></label>
         <label class="row">Rank suffix <input type="text" id="hRankSuffix" style="max-width:90px" placeholder="of 25"></label>
         <label class="row">Confidence label <input type="text" id="hConfLabel" style="max-width:100px" placeholder="Confidence"></label>
         <label class="row">Confidence dot <span class="sw"><input type="checkbox" id="hConfDot"><i></i></span></label>
         <label class="row">Eyebrow UPPERCASE <span class="sw"><input type="checkbox" id="hDateUpper"><i></i></span></label>
-      </div>
+      </div></div>
     </div>
     <div class="pfoot" id="pfoot" style="display:none"><button id="pDone">Done</button></div>
   </div>
@@ -160,19 +175,23 @@
   function openConfig(){
     const url = location.href.split('#')[0].split('?')[0] + '?dialog=1';
     let style; try{ style=tableau.DialogStyle.Modeless; }catch(_){ style='modeless'; }
-    try{ tableau.extensions.ui.displayDialogAsync(url,'x',{width:316,height:660,dialogStyle:style}).then(()=>{}).catch(()=>{}); }catch(_){}
+    try{ tableau.extensions.ui.displayDialogAsync(url,'x',{width:320,height:560,dialogStyle:style}).then(()=>{}).catch(()=>{}); }catch(_){}
   }
   function initDialog(){
     document.body.classList.add('dialog');
     tableau.extensions.initializeDialogAsync().then(()=>{
-      loadCfg(); buildStyles(); bindControls(); syncControls();
+      loadCfg(); buildStyles(); bindControls(); syncControls(); initTabs();
       $('pfoot').style.display='block';
       const done=()=>{ try{ tableau.extensions.ui.closeDialog('done'); }catch(_){} };
       $('pDone').onclick=done; $('pClose').onclick=done;
     }).catch(e=>{ $('msgText').innerHTML='<b>Dialog error</b>'+esc(String(e&&e.message||e)); });
   }
+  function initTabs(){
+    const btns=[...document.querySelectorAll('#tabs button')];
+    btns.forEach(b=>b.onclick=()=>{ btns.forEach(x=>x.classList.toggle('on',x===b));
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.id==='t-'+b.dataset.t)); });
+  }
 
-  /* render */
   async function render(){
     if(!worksheet) return;
     try{
@@ -195,37 +214,23 @@
     return await ws.getSummaryDataAsync({maxRows:50,ignoreSelection:true});
   }
 
-  /* draw */
   function confColor(v){ return v>=80?'#3F8F63':v>=50?'#C9A227':'#C2410C'; }
   function pill(html){ return `<span class="pill" style="background:${cfg.badgeBg};color:${cfg.badgeText}">${html}</span>`; }
   function draw(v){
     const bg = cfg.bgStyle==='gradient' ? `linear-gradient(135deg,${cfg.bg1},${cfg.bg2})` : cfg.bg1;
-    const eyebrowBits=[];
-    if(v.date) eyebrowBits.push(esc(v.date.fmt));
-    const eyebrow = eyebrowBits.length ? `<div class="h-eyebrow" style="color:${cfg.subColor};font-size:${Math.max(10,cfg.nameSize*0.23)}px${cfg.dateUpper?'':';text-transform:none'}">${eyebrowBits.join(' · ')}</div>` : '';
+    const eyebrow = v.date ? `<div class="h-eyebrow" style="color:${cfg.subColor};font-size:${Math.max(10,Math.round(cfg.nameSize*0.23))}px${cfg.dateUpper?'':';text-transform:none'}">${esc(v.date.fmt)}</div>` : '';
     const teamPill = v.team ? pill(`Team · <b class="mono">${esc(v.team.fmt)}</b>`) : '';
     const rankPill = v.rank ? pill(`${esc(cfg.rankLabel)} <span class="mono">${esc(v.rank.fmt)}${cfg.rankSuffix?' '+esc(cfg.rankSuffix):''}</span>`) : '';
     const confPill = v.conf ? pill(`${cfg.confDot?`<span class="gdot" style="background:${confColor(v.conf.raw)}"></span>`:''}${esc(cfg.confLabel)} <span class="mono">${esc(v.conf.fmt)}</span>`) : '';
-
-    const left = `<div class="h-left">
-        ${eyebrow}
-        <div class="h-name" style="color:${cfg.textColor};font-size:${cfg.nameSize}px">${esc(v.name.fmt)}</div>
-        ${teamPill?`<div class="h-sub">${teamPill}</div>`:''}
-      </div>`;
-    const right = `<div class="h-right">
-        <div class="h-score" style="color:${cfg.scoreColor};font-size:${cfg.scoreSize}px">${esc(v.score.fmt)}${cfg.scoreMax?`<span class="of">${esc(cfg.scoreMax)}</span>`:''}</div>
-        ${(rankPill||confPill)?`<div class="h-badges">${rankPill}${confPill}</div>`:''}
-      </div>`;
-
+    const left = `<div class="h-left">${eyebrow}<div class="h-name" style="color:${cfg.textColor};font-size:${cfg.nameSize}px">${esc(v.name.fmt)}</div>${teamPill?`<div class="h-sub">${teamPill}</div>`:''}</div>`;
+    const right = `<div class="h-right"><div class="h-score" style="color:${cfg.scoreColor};font-size:${cfg.scoreSize}px">${esc(v.score.fmt)}${cfg.scoreMax?`<span class="of">${esc(cfg.scoreMax)}</span>`:''}</div>${(rankPill||confPill)?`<div class="h-badges">${rankPill}${confPill}</div>`:''}</div>`;
     const hdr=$('hdr');
     hdr.style.cssText=`background:${bg};border-radius:${cfg.radius}px;padding:${cfg.padding}px ${cfg.padding+8}px;font-family:${cfg.fontFamily}`;
     hdr.innerHTML = (cfg.scoreSide==='left' ? right+left : left+right) + (cfg.spectrum?'<div class="spectrum"></div>':'');
-    hdr.classList.remove('hide'); $('msg').classList.add('hide');
-    last=v;
+    hdr.classList.remove('hide'); $('msg').classList.add('hide'); last=v;
   }
   function redraw(){ if(last) draw(last); }
 
-  /* dialog controls */
   function buildStyles(){
     const box=$('styles'); box.innerHTML='';
     Object.keys(PRESETS).forEach(name=>{ const p=PRESETS[name]; const el=document.createElement('div');
