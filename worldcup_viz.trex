@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest manifest-version="0.1" xmlns="http://www.tableau.com/xml/extension_manifest">
+  <dashboard-extension id="com.flydubai.cx.worldcup-ticker" extension-version="1.0.0">
+    <default-locale>en_US</default-locale>
+    <name resource-id="name"/>
+    <description>Live FIFA World Cup ticker — scrolling scores pulled from ESPN's public feed. Decorative: it uses no workbook data; drop it onto a dashboard zone (size it as a thin strip).</description>
+    <author name="Mohamed Alsaadany" email="mohamed.alsaadany@outlook.com" organization="flydubai" website="https://www.flydubai.com"/>
+    <min-api-version>1.10</min-api-version>
+    <source-location>
+      <url>https://hadojin.github.io/Tradar/worldcup_viz.html</url>
+    </source-location>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAIAAAADnC86AAAAMElEQVR42u3NQQkAAAgEsEtoHxNZ0xKCn8H+S/W8iFgsFovFYrFYLBaLxWKxWHxnAd/O7/lM2rhgAAAAAElFTkSuQmCC</icon>
+  </dashboard-extension>
+  <resources>
+    <resource id="name"><text locale="en_US">World Cup Ticker</text></resource>
+  </resources>
+</manifest>
