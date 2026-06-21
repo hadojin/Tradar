@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KPI Ruler (Viz)</title>
+<script src="tableau.extensions.1.latest.min.js"></script>
+<style>
+  :root{ --blue:#4E79A7; --blue-deep:#3B5E84; --ink:#2b2b2b; --muted:#7a7a7a; --line:#e6e6e6; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Segoe UI',Tahoma,sans-serif;color:var(--ink);background:#fff;display:flex;overflow:hidden}
+  #stage{flex:1;position:relative;display:flex;min-height:0}
+  #wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:16px 26px;min-width:0}
+  #ruler{position:relative;width:100%;max-width:640px}
+  #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:#fff}
+  .msg{text-align:center;color:var(--muted);font:400 13px 'Segoe UI';max-width:320px;line-height:1.55}
+  .msg b{color:var(--ink);display:block;margin-bottom:6px;font:600 14px 'Segoe UI'}
+  .msg .enc{color:var(--blue-deep);font-weight:600}
+  .hide{display:none!important}
+
+  .track{position:absolute;left:0;right:0;border-radius:6px}
+  .tick{position:absolute;width:1px;background:#d3ccbc}
+  .center{position:absolute;left:50%;transform:translateX(-50%);border-radius:2px}
+  .cl{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;font:600 10px 'Segoe UI';letter-spacing:.03em}
+  .cl b{font-family:'Consolas',monospace}
+  .fill{position:absolute;border-radius:5px;transition:all .45s cubic-bezier(.3,.7,.2,1)}
+  .ptr{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;transition:left .45s cubic-bezier(.3,.7,.2,1)}
+  .ptr .pv{font:700 13px 'Consolas',monospace;margin-bottom:3px;white-space:nowrap}
+  .ptr .tri{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent}
+  .ptr .pl{width:3px;border-radius:2px}
+  .delta{position:absolute;right:0;top:0;font:600 12px 'Consolas',monospace;padding:2px 8px;border-radius:999px}
+
+  body.dialog{display:block}
+  body.dialog #stage{display:none}
+  #panel{display:none}
+  body.dialog #panel{display:flex;flex-direction:column;height:100vh}
+  .phead{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .phead h3{font:700 13px 'Segoe UI'}
+  .phead .x{cursor:pointer;color:#999;font-size:18px;border:0;background:none}
+  .tabs{display:flex;gap:1px;padding:7px 8px 0;border-bottom:1px solid var(--line);flex:0 0 auto;overflow-x:auto}
+  .tabs button{font:600 11px 'Segoe UI';color:#888;background:none;border:0;padding:8px 9px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+  .tabs button.on{color:var(--blue-deep);border-bottom-color:var(--blue)}
+  .pbody{overflow-y:auto;padding:8px 14px 18px;flex:1 1 auto}
+  .tab{display:none} .tab.on{display:block}
+  .grp{margin-top:6px}
+  .grp h4{font:700 9.5px 'Segoe UI';letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;padding-bottom:4px;border-bottom:1px dashed var(--line)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;font:500 12px 'Segoe UI';color:#333}
+  .row.col{flex-direction:column;align-items:stretch;gap:4px}
+  .row input[type=range]{width:120px}
+  .row input[type=number]{width:60px;font:500 12px 'Segoe UI';padding:4px 6px;border:1px solid #cfcfcf;border-radius:5px}
+  .row input[type=text]{font:500 12px 'Segoe UI';padding:5px 7px;border:1px solid #cfcfcf;border-radius:5px;width:100%}
+  .row input[type=color]{width:30px;height:22px;border:1px solid #cfcfcf;border-radius:5px;padding:0;background:#fff;cursor:pointer}
+  .row select{max-width:150px;font:500 12px 'Segoe UI';padding:4px 6px;border:1px solid #cfcfcf;border-radius:5px;background:#fff;cursor:pointer}
+  .sw{position:relative;width:34px;height:19px;flex:0 0 auto;cursor:pointer}
+  .sw input{display:none}
+  .sw i{position:absolute;inset:0;background:#d2d2d2;border-radius:999px;transition:background .16s}
+  .sw i::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .16s}
+  .sw input:checked + i{background:var(--blue)}
+  .sw input:checked + i::after{transform:translateX(15px)}
+  .muted{color:var(--muted);font-size:11px;font-weight:400}
+  .styles{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+  .styt{border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;font:600 11px 'Segoe UI';color:#555}
+  .styt.on{border-color:var(--blue);box-shadow:0 0 0 2px rgba(78,121,167,.15)}
+  .styt .sw2{display:block;height:8px;border-radius:4px;margin-bottom:6px}
+  .pfoot{flex:0 0 auto;padding:10px 14px;border-top:1px solid var(--line)}
+  .pfoot button{width:100%;font:600 13px 'Segoe UI';color:#fff;background:var(--blue);border:0;border-radius:6px;padding:10px;cursor:pointer}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="wrap"><div id="ruler" class="hide"></div></div>
+    <div id="msg"><div class="msg" id="msgText"><b>Loading…</b>Starting the ruler.</div></div>
+  </div>
+
+  <div id="panel">
+    <div class="phead"><h3>Ruler settings</h3><button class="x" id="pClose">&times;</button></div>
+    <div class="tabs" id="tabs">
+      <button class="on" data-t="style">Style</button>
+      <button data-t="scale">Scale</button>
+      <button data-t="colour">Colour</button>
+      <button data-t="labels">Labels</button>
+    </div>
+    <div class="pbody">
+      <div class="tab on" id="t-style"><div class="grp"><h4>Style preset</h4><div class="styles" id="styles"></div></div>
+        <div class="grp"><h4>Marker</h4>
+          <label class="row">Marker <select id="rDotStyle"><option value="tri">Triangle</option><option value="line">Line</option></select></label>
+          <div class="row col"><span>Strip height <span class="muted" id="rStripV"></span></span><input type="range" id="rStrip" min="3" max="16" step="1"></div>
+          <div class="row col"><span>Tick height <span class="muted" id="rTickHV"></span></span><input type="range" id="rTickH" min="12" max="40" step="2"></div>
+          <label class="row">Diverging fill <span class="sw"><input type="checkbox" id="rFill"><i></i></span></label>
+        </div>
+      </div>
+
+      <div class="tab" id="t-scale"><div class="grp"><h4>Scale</h4>
+        <label class="row">Mode <select id="rScaleMode"><option value="auto">Auto (% of centre)</option><option value="fixed">Fixed range</option></select></label>
+        <div class="row col"><span>Full scale = ±<span class="muted" id="rRelPctV"></span> of centre</span><input type="range" id="rRelPct" min="5" max="100" step="5"></div>
+        <label class="row">Fixed ± range <input type="number" id="rRange" min="0.1" step="0.1"></label>
+        <label class="row">Better when <select id="rGoodDir"><option value="up">Higher</option><option value="down">Lower</option></select></label>
+      </div></div>
+
+      <div class="tab" id="t-colour"><div class="grp"><h4>Colours</h4>
+        <label class="row">Track <input type="color" id="rTrack"></label>
+        <label class="row">Centre tick <input type="color" id="rCentre"></label>
+        <label class="row">Better (above) <input type="color" id="rGood"></label>
+        <label class="row">Below <input type="color" id="rBad"></label>
+        <label class="row">Number text <input type="color" id="rNum"></label>
+        <label class="row">Label text <input type="color" id="rLabelColor"></label>
+      </div></div>
+
+      <div class="tab" id="t-labels"><div class="grp"><h4>Labels</h4>
+        <label class="row">Centre label <input type="text" id="rCentreLabel" style="max-width:90px" placeholder="avg"></label>
+        <label class="row">Unit suffix <input type="text" id="rUnit" style="max-width:70px" placeholder="%"></label>
+        <label class="row">Decimals <select id="rDecimals"><option value="tableau">Use Tableau</option><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
+        <label class="row">Show centre value <span class="sw"><input type="checkbox" id="rShowCentre"><i></i></span></label>
+        <label class="row">Show your value <span class="sw"><input type="checkbox" id="rShowValue"><i></i></span></label>
+        <label class="row">Show delta chip <span class="sw"><input type="checkbox" id="rShowDelta"><i></i></span></label>
+      </div></div>
+    </div>
+    <div class="pfoot" id="pfoot" style="display:none"><button id="pDone">Done</button></div>
+  </div>
+
+<script>
+"use strict";
+(function(){
+  const $ = id => document.getElementById(id);
+  const DIALOG = new URLSearchParams(location.search).get('dialog')==='1';
+  let worksheet=null, last=null;
+
+  const TOGGLES=[['rFill','fill'],['rShowCentre','showCentre'],['rShowValue','showValue'],['rShowDelta','showDelta']];
+  const RANGES =[['rStrip','stripH','px'],['rTickH','tickH','px'],['rRelPct','relPct','%']];
+  const COLORS =[['rTrack','trackColor'],['rCentre','centreColor'],['rGood','goodColor'],['rBad','badColor'],['rNum','numColor'],['rLabelColor','labelColor']];
+  const SELECTS=[['rDotStyle','dotStyle'],['rScaleMode','scaleMode'],['rGoodDir','goodDir'],['rDecimals','decimals']];
+  const TEXTS  =[['rCentreLabel','centreLabel'],['rUnit','unit']];
+
+  const PRESETS = {
+    Clean:  {sw:'#16294f',o:{trackColor:'#e8e3d7',centreColor:'#16294f',goodColor:'#2E7D52',badColor:'#C2410C',numColor:'#16294f',labelColor:'#8a95a0',stripH:7,tickH:24,fill:true,dotStyle:'tri'}},
+    Bold:   {sw:'#16294f',o:{trackColor:'#dfe5ec',centreColor:'#16294f',goodColor:'#2E7D52',badColor:'#C2410C',numColor:'#16294f',labelColor:'#6a7686',stripH:12,tickH:30,fill:true,dotStyle:'line'}},
+    Minimal:{sw:'#9aa3b0',o:{trackColor:'#eeebe3',centreColor:'#6a7686',goodColor:'#4E79A7',badColor:'#C9882A',numColor:'#2b2b2b',labelColor:'#9aa3b0',stripH:4,tickH:18,fill:false,dotStyle:'tri'}},
+    Dark:   {sw:'#0e1d36',o:{trackColor:'#33415a',centreColor:'#cdd6e6',goodColor:'#5BC08A',badColor:'#E8825B',numColor:'#ffffff',labelColor:'#9fb0c6',stripH:8,tickH:26,fill:true,dotStyle:'tri'}},
+  };
+
+  const DEFAULTS = {
+    preset:'Clean', scaleMode:'auto', relPct:30, range:10, goodDir:'up',
+    trackColor:'#e8e3d7', centreColor:'#16294f', goodColor:'#2E7D52', badColor:'#C2410C', numColor:'#16294f', labelColor:'#8a95a0',
+    stripH:7, tickH:24, dotStyle:'tri', fill:true,
+    centreLabel:'avg', unit:'', decimals:'tableau', showCentre:true, showValue:true, showDelta:true,
+    fontFamily:"'Segoe UI', Tahoma, sans-serif"
+  };
+  let cfg = JSON.parse(JSON.stringify(DEFAULTS));
+
+  function loadCfg(){ try{ const r=tableau.extensions.settings.get('rulerCfg'); if(r) cfg={...JSON.parse(JSON.stringify(DEFAULTS)),...JSON.parse(r)}; }catch(_){} }
+  let saveT=null;
+  function saveCfg(){ try{ tableau.extensions.settings.set('rulerCfg', JSON.stringify(cfg));
+    clearTimeout(saveT); saveT=setTimeout(()=>{ try{ tableau.extensions.settings.saveAsync(); }catch(_){} },250); }catch(_){} }
+
+  if (DIALOG) initDialog(); else initViz();
+
+  function initViz(){
+    tableau.extensions.initializeAsync({ configure: openConfig }).then(()=>{
+      worksheet = tableau.extensions.worksheetContent.worksheet;
+      loadCfg();
+      worksheet.addEventListener(tableau.TableauEventType.SummaryDataChanged, render);
+      try{ tableau.extensions.settings.addEventListener(tableau.TableauEventType.SettingsChanged, ()=>{ loadCfg(); redraw(); }); }catch(_){}
+      render();
+    }).catch(e=>showMsg('Couldn’t start', esc(String(e&&e.message||e))));
+  }
+  function openConfig(){
+    const url = location.href.split('#')[0].split('?')[0] + '?dialog=1';
+    let style; try{ style=tableau.DialogStyle.Modeless; }catch(_){ style='modeless'; }
+    try{ tableau.extensions.ui.displayDialogAsync(url,'x',{width:320,height:540,dialogStyle:style}).then(()=>{}).catch(()=>{}); }catch(_){}
+  }
+  function initDialog(){
+    document.body.classList.add('dialog');
+    tableau.extensions.initializeDialogAsync().then(()=>{
+      loadCfg(); buildStyles(); bindControls(); syncControls(); initTabs();
+      $('pfoot').style.display='block';
+      const done=()=>{ try{ tableau.extensions.ui.closeDialog('done'); }catch(_){} };
+      $('pDone').onclick=done; $('pClose').onclick=done;
+    }).catch(e=>{ $('msgText').innerHTML='<b>Dialog error</b>'+esc(String(e&&e.message||e)); });
+  }
+  function initTabs(){
+    const btns=[...document.querySelectorAll('#tabs button')];
+    btns.forEach(b=>b.onclick=()=>{ btns.forEach(x=>x.classList.toggle('on',x===b));
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.id==='t-'+b.dataset.t)); });
+  }
+
+  async function render(){
+    if(!worksheet) return;
+    try{
+      const spec = await worksheet.getVisualSpecificationAsync();
+      const marks = spec.marksSpecifications[spec.activeMarksSpecificationIndex];
+      const fieldBy={}; (marks.encodings||[]).forEach(enc=>{ const f=enc.field||(enc.fields&&enc.fields[0]); if(f) fieldBy[enc.id]=f.name; });
+      const dt = await fetchTable(worksheet);
+      if(!dt.data.length) return showMsg('No data','Filter the sheet to one row.');
+      const row=dt.data[0];
+      const get=id=>{ const fn=fieldBy[id]; if(!fn) return null; const ci=dt.columns.findIndex(c=>c.fieldName===fn); if(ci<0) return null;
+        const cell=row[ci]; const raw=typeof cell.value==='number'?cell.value:parseFloat(cell.formattedValue); return {raw, fmt:cell.formattedValue}; };
+      const value=get('value'), centre=get('centre');
+      if(!value || !centre) return showMsg('Assign two measures','Put your figure on <span class="enc">Value</span> and the average on <span class="enc">Centre</span>.');
+      draw(value, centre);
+    }catch(e){ showMsg('Error', esc(String(e&&e.message||e))); }
+  }
+  async function fetchTable(ws){
+    if(ws.getSummaryDataReaderAsync){ const rd=await ws.getSummaryDataReaderAsync(undefined,{ignoreSelection:true}); const dt=await rd.getAllPagesAsync(); await rd.releaseAsync(); return dt; }
+    return await ws.getSummaryDataAsync({maxRows:20,ignoreSelection:true});
+  }
+
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  function fmtN(raw,fmt){ if(cfg.decimals==='tableau') return fmt; let s=(+raw).toFixed(+cfg.decimals||0); return s; }
+
+  function draw(value, centre){
+    last={value,centre};
+    const dev = value.raw - centre.raw;
+    const fullDev = cfg.scaleMode==='fixed' ? Math.max(Math.abs(+cfg.range)||1,1e-6) : Math.max(Math.abs(centre.raw)*(+cfg.relPct/100),1e-6);
+    const pos = clamp(50 + (dev/fullDev)*50, 4, 96);
+    const good = Math.abs(dev)<1e-9 ? 'flat' : (((dev>0)===(cfg.goodDir==='up')) ? 'up':'down');
+    const col = good==='up'?cfg.goodColor : good==='down'?cfg.badColor : cfg.centreColor;
+    const fillL = pos>=50 ? 50 : pos, fillW = Math.abs(pos-50);
+    const u=esc(cfg.unit);
+    const H = 70;                              // ruler box height
+    const midY = 32;                           // track vertical centre
+    const fillS = cfg.fill ? `<div class="fill" style="left:${fillL}%;width:${fillW}%;top:${midY-(cfg.stripH/2)+1}px;height:${cfg.stripH-2}px;background:${col}"></div>` : '';
+    let ticks=''; for(let t=10;t<=90;t+=10){ if(t!==50) ticks+=`<span class="tick" style="left:${t}%;top:${midY-5}px;height:10px"></span>`; }
+    const marker = cfg.dotStyle==='line'
+      ? `<span class="pl" style="height:${cfg.tickH}px;background:${col}"></span>`
+      : `<span class="tri" style="border-top:8px solid ${col}"></span>`;
+    const yourVal = cfg.showValue ? `<span class="pv" style="color:${col}">${esc(fmtN(value.raw,value.fmt))}${u}</span>` : '';
+    const centreVal = cfg.showCentre ? `<div class="cl" style="top:${midY+cfg.tickH/2+1}px;color:${cfg.labelColor}">${esc(cfg.centreLabel)} <b style="color:${cfg.numColor}">${esc(fmtN(centre.raw,centre.fmt))}${u}</b></div>` : '';
+    const sign = dev>0?'+':'';
+    const deltaChip = cfg.showDelta ? `<div class="delta" style="color:${col};background:${good==='up'?'#e7f1ec':good==='down'?'#f9e9e0':'#f0ece2'}">${sign}${esc(fmtN(dev, sign+Math.abs(Math.round(dev*100)/100)))}${u}</div>` : '';
+
+    $('ruler').innerHTML = `<div style="position:relative;height:${H}px;font-family:${cfg.fontFamily}">
+      ${deltaChip}
+      <div class="track" style="top:${midY-cfg.stripH/2}px;height:${cfg.stripH}px;background:${cfg.trackColor}"></div>
+      ${ticks}
+      ${fillS}
+      <div class="center" style="top:${midY-cfg.tickH/2}px;width:2px;height:${cfg.tickH}px;background:${cfg.centreColor}"></div>
+      ${centreVal}
+      <div class="ptr" style="left:${pos}%;top:${midY-cfg.tickH/2-20}px">${yourVal}${marker}</div>
+    </div>`;
+    $('ruler').classList.remove('hide'); $('msg').classList.add('hide');
+  }
+  function redraw(){ if(last) draw(last.value,last.centre); }
+
+  function buildStyles(){
+    const box=$('styles'); box.innerHTML='';
+    Object.keys(PRESETS).forEach(name=>{ const p=PRESETS[name]; const el=document.createElement('div');
+      el.className='styt'+(cfg.preset===name?' on':'');
+      el.innerHTML=`<span class="sw2" style="background:${p.sw}"></span>${name}`;
+      el.onclick=()=>applyPreset(name); box.appendChild(el); });
+  }
+  function applyPreset(name){ const p=PRESETS[name]; if(!p)return; Object.assign(cfg,p.o); cfg.preset=name;
+    [...document.querySelectorAll('.styt')].forEach(s=>s.classList.toggle('on', s.textContent.trim()===name));
+    syncControls(); saveCfg(); redraw(); }
+  function bindControls(){
+    TOGGLES.forEach(([id,k])=>$(id).addEventListener('change',e=>{cfg[k]=e.target.checked;saveCfg();redraw();}));
+    RANGES.forEach(([id,k,suf])=>$(id).addEventListener('input',e=>{cfg[k]=+e.target.value;const v=$(id+'V');if(v)v.textContent=e.target.value+suf;saveCfg();redraw();}));
+    COLORS.forEach(([id,k])=>$(id).addEventListener('input',e=>{cfg[k]=e.target.value;saveCfg();redraw();}));
+    SELECTS.forEach(([id,k])=>$(id).addEventListener('change',e=>{cfg[k]=e.target.value;saveCfg();redraw();}));
+    TEXTS.forEach(([id,k])=>$(id).addEventListener('input',e=>{cfg[k]=e.target.value;saveCfg();redraw();}));
+    $('rRange').addEventListener('input',e=>{cfg.range=+e.target.value; if(cfg.scaleMode==='fixed'){saveCfg();redraw();}});
+  }
+  function syncControls(){
+    TOGGLES.forEach(([id,k])=>{const el=$(id);if(el)el.checked=cfg[k];});
+    RANGES.forEach(([id,k,suf])=>{const el=$(id);if(el){el.value=cfg[k];const v=$(id+'V');if(v)v.textContent=cfg[k]+suf;}});
+    COLORS.forEach(([id,k])=>{const el=$(id);if(el)el.value=cfg[k];});
+    SELECTS.forEach(([id,k])=>{const el=$(id);if(el)el.value=cfg[k];});
+    TEXTS.forEach(([id,k])=>{const el=$(id);if(el)el.value=cfg[k];});
+    if($('rRange'))$('rRange').value=cfg.range;
+  }
+
+  function showMsg(t,b){ const r=$('ruler'); if(r)r.classList.add('hide'); $('msg').classList.remove('hide'); $('msgText').innerHTML='<b>'+t+'</b>'+(b||''); }
+  function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+})();
+</script>
+</body>
+</html>
