@@ -213,7 +213,9 @@
       if(!numCols.length) return showMsg('Drop your measures','Put your KPI measures on the <span class="enc">Values</span> shelf — one tile per measure.');
       const kpis = numCols.map(c=>{
         let sum=0,nn=0,fmt=null;
-        dt.data.forEach(r=>{ const cell=r[c.index]; const v=cell.value; const num=typeof v==='number'?v:parseFloat(cell.formattedValue);
+        dt.data.forEach(r=>{ const cell=r[c.index];
+          const nv=cell.nativeValue, v=cell.value;                        // nativeValue = full precision (0.98, not display-rounded 1)
+          const num=(typeof nv==='number')?nv:(typeof v==='number'?v:parseFloat(cell.formattedValue));
           if(!isNaN(num)){ sum+=num; nn++; if(fmt===null) fmt=cell.formattedValue; } });
         return { field:c.fieldName, raw: nn? sum/nn : 0, fmt: fmt!==null?fmt:'—' };
       });

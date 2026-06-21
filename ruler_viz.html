@@ -197,7 +197,8 @@
       if(!dt.data.length) return showMsg('No data','Filter the sheet to one row.');
       const row=dt.data[0];
       const get=id=>{ const fn=fieldBy[id]; if(!fn) return null; const ci=dt.columns.findIndex(c=>c.fieldName===fn); if(ci<0) return null;
-        const cell=row[ci]; const raw=typeof cell.value==='number'?cell.value:parseFloat(cell.formattedValue); return {raw, fmt:cell.formattedValue}; };
+        const cell=row[ci]; const nv=cell.nativeValue, v=cell.value;   // nativeValue = full precision, not display-rounded
+        const raw=(typeof nv==='number')?nv:(typeof v==='number'?v:parseFloat(cell.formattedValue)); return {raw, fmt:cell.formattedValue}; };
       const value=get('value'), centre=get('centre');
       if(!value || !centre) return showMsg('Assign two measures','Put your figure on <span class="enc">Value</span> and the average on <span class="enc">Centre</span>.');
       draw(value, centre);
