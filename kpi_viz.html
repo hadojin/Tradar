@@ -138,7 +138,7 @@
 (function(){
   const $ = id => document.getElementById(id);
   const DIALOG = new URLSearchParams(location.search).get('dialog')==='1';
-  let worksheet=null, lastKpis=null, lastSig='';
+  let worksheet=null, lastKpis=null, lastFields=[];
 
   const TOGGLES = [['kThousands','thousands']];
   const RANGES  = [['kMinW','minTileW','px'],['kGap','gap','px'],['kPadding','padding','px'],['kRadius','radius','px'],['kMinH','minHeight','px'],['kNumSize','numSize','px'],['kLabelSize','labelSize','px']];
@@ -164,7 +164,7 @@
 
   function loadCfg(){ try{ const r=tableau.extensions.settings.get('kpiCfg'); if(r) cfg={...JSON.parse(JSON.stringify(DEFAULTS)),...JSON.parse(r)}; if(!cfg.tiles)cfg.tiles={}; }catch(_){} }
   let saveT=null;
-  function saveCfg(){ try{ tableau.extensions.settings.set('kpiCfg', JSON.stringify(cfg));
+  function saveCfg(){ if(DIALOG) return; try{ tableau.extensions.settings.set('kpiCfg', JSON.stringify(cfg));
     clearTimeout(saveT); saveT=setTimeout(()=>{ try{ tableau.extensions.settings.saveAsync(); }catch(_){} }, 250); }catch(_){} }
 
   if (DIALOG) initDialog(); else initViz();
@@ -174,23 +174,25 @@
       worksheet = tableau.extensions.worksheetContent.worksheet;
       loadCfg();
       worksheet.addEventListener(tableau.TableauEventType.SummaryDataChanged, render);
-      try{ tableau.extensions.settings.addEventListener(tableau.TableauEventType.SettingsChanged, ()=>{ loadCfg(); redraw(); }); }catch(_){}
       render();
     }).catch(e=>showMsg('Couldn’t start', esc(String(e&&e.message||e))));
   }
   function openConfig(){
     const url = location.href.split('#')[0].split('?')[0] + '?dialog=1';
-    let style; try{ style = tableau.DialogStyle.Modeless; }catch(_){ style='modeless'; }
-    try{ tableau.extensions.ui.displayDialogAsync(url, 'x', { width:320, height:560, dialogStyle:style }).then(()=>{}).catch(()=>{}); }catch(_){}
+    let style; try{ style = tableau.DialogStyle.Modal; }catch(_){ style='modal'; }
+    const payload = JSON.stringify({ cfg:cfg, fields:lastFields });
+    tableau.extensions.ui.displayDialogAsync(url, payload, { width:320, height:560, dialogStyle:style })
+      .then(cp=>{ try{ if(cp){ cfg={...JSON.parse(JSON.stringify(DEFAULTS)),...JSON.parse(cp)}; if(!cfg.tiles)cfg.tiles={}; saveCfg(); redraw(); } }catch(_){} })
+      .catch(()=>{});
   }
   function initDialog(){
     document.body.classList.add('dialog');
-    tableau.extensions.initializeDialogAsync().then(()=>{
-      loadCfg(); buildStyles(); bindControls(); syncControls(); initTabs();
-      let fields=[]; try{ fields=JSON.parse(tableau.extensions.settings.get('kpiFields')||'[]'); }catch(_){}
-      buildTileEditor(fields);
+    tableau.extensions.initializeDialogAsync().then(payload=>{
+      let fields=[]; try{ const o=JSON.parse(payload); if(o&&o.cfg) cfg={...JSON.parse(JSON.stringify(DEFAULTS)),...o.cfg}; if(o&&o.fields) fields=o.fields; }catch(_){}
+      if(!cfg.tiles)cfg.tiles={};
+      buildStyles(); bindControls(); syncControls(); initTabs(); buildTileEditor(fields);
       $('pfoot').style.display='block';
-      const done=()=>{ try{ tableau.extensions.ui.closeDialog('done'); }catch(_){} };
+      const done=()=>{ try{ tableau.extensions.ui.closeDialog(JSON.stringify(cfg)); }catch(_){} };
       $('pDone').onclick=done; $('pClose').onclick=done;
     }).catch(e=>{ $('msgText').innerHTML='<b>Dialog error</b>'+esc(String(e&&e.message||e)); });
   }
@@ -212,8 +214,7 @@
           if(!isNaN(num)){ sum+=num; nn++; if(fmt===null) fmt=cell.formattedValue; } });
         return { field:c.fieldName, raw: nn? sum/nn : 0, fmt: fmt!==null?fmt:'—' };
       });
-      const sig = kpis.map(k=>k.field).join('|');
-      if(sig!==lastSig){ lastSig=sig; try{ tableau.extensions.settings.set('kpiFields', JSON.stringify(kpis.map(k=>k.field))); tableau.extensions.settings.saveAsync(); }catch(_){} }
+      lastFields = kpis.map(k=>k.field);
       drawTiles(kpis);
     }catch(e){ showMsg('Error', esc(String(e&&e.message||e))); }
   }

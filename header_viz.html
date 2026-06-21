@@ -135,7 +135,7 @@
 (function(){
   const $ = id => document.getElementById(id);
   const DIALOG = new URLSearchParams(location.search).get('dialog')==='1';
-  let worksheet=null, last=null, lastSig='';
+  let worksheet=null, last=null, lastFields=[];
 
   const RANGES = [['hNameSize','nameSize','px'],['hScoreSize','scoreSize','px'],['hPad','padding','px'],['hRadius','radius','px']];
   const COLORS = [['hBg1','bg1'],['hBg2','bg2'],['hText','textColor'],['hSub','subColor'],['hScoreColor','scoreColor'],['hBadgeBg','badgeBg'],['hBadgeText','badgeText']];
@@ -162,7 +162,7 @@
 
   function loadCfg(){ try{ const r=tableau.extensions.settings.get('hdrCfg'); if(r) cfg={...JSON.parse(JSON.stringify(DEFAULTS)),...JSON.parse(r)}; if(!cfg.fields)cfg.fields={}; }catch(_){} }
   let saveT=null;
-  function saveCfg(){ try{ tableau.extensions.settings.set('hdrCfg', JSON.stringify(cfg));
+  function saveCfg(){ if(DIALOG) return; try{ tableau.extensions.settings.set('hdrCfg', JSON.stringify(cfg));
     clearTimeout(saveT); saveT=setTimeout(()=>{ try{ tableau.extensions.settings.saveAsync(); }catch(_){} },250); }catch(_){} }
 
   if (DIALOG) initDialog(); else initViz();
@@ -172,23 +172,25 @@
       worksheet = tableau.extensions.worksheetContent.worksheet;
       loadCfg();
       worksheet.addEventListener(tableau.TableauEventType.SummaryDataChanged, render);
-      try{ tableau.extensions.settings.addEventListener(tableau.TableauEventType.SettingsChanged, ()=>{ loadCfg(); redraw(); }); }catch(_){}
       render();
     }).catch(e=>showMsg('Couldn’t start', esc(String(e&&e.message||e))));
   }
   function openConfig(){
     const url = location.href.split('#')[0].split('?')[0] + '?dialog=1';
-    let style; try{ style=tableau.DialogStyle.Modeless; }catch(_){ style='modeless'; }
-    try{ tableau.extensions.ui.displayDialogAsync(url,'x',{width:330,height:560,dialogStyle:style}).then(()=>{}).catch(()=>{}); }catch(_){}
+    let style; try{ style=tableau.DialogStyle.Modal; }catch(_){ style='modal'; }
+    const payload = JSON.stringify({ cfg:cfg, fields:lastFields });
+    tableau.extensions.ui.displayDialogAsync(url, payload, {width:330,height:560,dialogStyle:style})
+      .then(cp=>{ try{ if(cp){ cfg={...JSON.parse(JSON.stringify(DEFAULTS)),...JSON.parse(cp)}; if(!cfg.fields)cfg.fields={}; saveCfg(); redraw(); } }catch(_){} })
+      .catch(()=>{});
   }
   function initDialog(){
     document.body.classList.add('dialog');
-    tableau.extensions.initializeDialogAsync().then(()=>{
-      loadCfg(); buildStyles(); bindControls(); syncControls(); initTabs();
-      let fl=[]; try{ fl=JSON.parse(tableau.extensions.settings.get('hdrFields')||'[]'); }catch(_){}
-      buildFieldEditor(fl);
+    tableau.extensions.initializeDialogAsync().then(payload=>{
+      let fl=[]; try{ const o=JSON.parse(payload); if(o&&o.cfg) cfg={...JSON.parse(JSON.stringify(DEFAULTS)),...o.cfg}; if(o&&o.fields) fl=o.fields; }catch(_){}
+      if(!cfg.fields)cfg.fields={};
+      buildStyles(); bindControls(); syncControls(); initTabs(); buildFieldEditor(fl);
       $('pfoot').style.display='block';
-      const done=()=>{ try{ tableau.extensions.ui.closeDialog('done'); }catch(_){} };
+      const done=()=>{ try{ tableau.extensions.ui.closeDialog(JSON.stringify(cfg)); }catch(_){} };
       $('pDone').onclick=done; $('pClose').onclick=done;
     }).catch(e=>{ $('msgText').innerHTML='<b>Dialog error</b>'+esc(String(e&&e.message||e)); });
   }
@@ -222,9 +224,7 @@
       if(!nameCol || !scoreCol) return showMsg('Assign Name &amp; Score','Put a dimension on <span class="enc">Name</span> and a measure on <span class="enc">Score</span>.');
 
       const others = dt.columns.filter(c=>c.fieldName!==nameF && c.fieldName!==scoreF);
-      // expose field list for the dialog editor
-      const sig = others.map(c=>c.fieldName).join('|');
-      if(sig!==lastSig){ lastSig=sig; try{ tableau.extensions.settings.set('hdrFields', JSON.stringify(others.map(c=>({field:c.fieldName, num:isNum(c)})))); tableau.extensions.settings.saveAsync(); }catch(_){} }
+      lastFields = others.map(c=>({field:c.fieldName, num:isNum(c)}));   // for the dialog editor (passed via payload)
 
       let firstStr=true;
       const items = others.map(c=>{
