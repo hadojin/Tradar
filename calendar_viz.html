@@ -11,8 +11,9 @@
   html,body{height:100%}
   body{font-family:'Segoe UI',Tahoma,sans-serif;color:var(--ink);background:#fff;display:flex;overflow:hidden}
   #stage{flex:1;position:relative;display:flex;min-height:0}
-  #scroll{flex:1;overflow:auto;padding:12px;min-width:0}
-  svg{display:block}
+  #scroll{flex:1;min-width:0;min-height:0;padding:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  #scroll.scrollmode{display:block;overflow:auto}
+  svg{display:block;max-width:100%;max-height:100%}
   #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:#fff}
   .msg{text-align:center;color:var(--muted);font:400 13px 'Segoe UI';max-width:300px;line-height:1.55}
   .msg b{color:var(--ink);display:block;margin-bottom:6px;font:600 14px 'Segoe UI'}
@@ -83,6 +84,8 @@
         <div class="row"><span class="muted">Days below this read as empty (not an active day) — filters out 1–2 unit noise days.</span></div>
       </div>
       <div class="grp"><h4>Layout</h4>
+        <label class="row">Auto-fit to space <span class="sw"><input type="checkbox" id="clAutoFit"><i></i></span></label>
+        <div class="row"><span class="muted">Scales the grid to fill the object and centres it. Turn off for a fixed cell size with scroll.</span></div>
         <label class="row">Week starts <select id="clWeekStart"><option value="mon">Monday</option><option value="sun">Sunday</option></select></label>
         <label class="row">Month labels <span class="sw"><input type="checkbox" id="clMonthLabels"><i></i></span></label>
         <label class="row">Weekday labels <span class="sw"><input type="checkbox" id="clWeekdayLabels"><i></i></span></label>
@@ -111,7 +114,7 @@
   let worksheet = null, lastRows = null;
   const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  const TOGGLES = [['clMonthLabels','monthLabels'],['clWeekdayLabels','weekdayLabels'],['clShowEmpty','showEmpty']];
+  const TOGGLES = [['clMonthLabels','monthLabels'],['clWeekdayLabels','weekdayLabels'],['clShowEmpty','showEmpty'],['clAutoFit','autoFit']];
   const RANGES  = [['clCellSize','cellSize','px'],['clCellGap','cellGap','px'],['clCellRadius','cellRadius','px'],['clLabelSize','labelSize','px']];
   const COLORS  = [['clLow','lowColor'],['clHigh','highColor'],['clEmpty','emptyColor'],['clLabelColor','labelColor']];
   const SELECTS = [['clScaleMode','scaleMode'],['clWeekStart','weekStart'],['clEmptyStyle','emptyStyle'],['clFont','fontFamily']];
@@ -120,7 +123,7 @@
     cellSize:13, cellGap:3, cellRadius:3,
     lowColor:'#cfe0f1', highColor:'#1d4675', emptyColor:'#e9edf2',
     scaleMode:'auto', scaleMin:0, scaleMax:100, activeMin:0,
-    weekStart:'mon', monthLabels:true, weekdayLabels:true, showEmpty:true, emptyStyle:'solid',
+    weekStart:'mon', monthLabels:true, weekdayLabels:true, showEmpty:true, emptyStyle:'solid', autoFit:true,
     fontFamily:"'Segoe UI', Tahoma, sans-serif", labelSize:10, labelColor:'#8a95a0'
   };
   let cfg = JSON.parse(JSON.stringify(DEFAULTS));
@@ -250,7 +253,13 @@
     }
 
     const W=leftM+(nCols+1)*step+2, H=topM+7*step+2;
-    const svg=$('cal'); svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('width',W); svg.setAttribute('height',H); svg.innerHTML=g;
+    const svg=$('cal'); svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+    svg.setAttribute('preserveAspectRatio','xMidYMid meet'); svg.innerHTML=g;
+    if(cfg.autoFit!==false){            // scale the grid to fill the object and centre it (xMid/YMid)
+      svg.setAttribute('width','100%'); svg.setAttribute('height','100%'); $('scroll').classList.remove('scrollmode');
+    } else {                            // fixed cell size, scroll if it overflows
+      svg.setAttribute('width',W); svg.setAttribute('height',H); $('scroll').classList.add('scrollmode');
+    }
     svg.classList.remove('hide'); $('msg').classList.add('hide');
   }
   function redraw(){ if(lastRows) drawCal(lastRows); }
