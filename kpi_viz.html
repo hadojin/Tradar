@@ -234,6 +234,8 @@
     const decRaw = (t.decimals!=null && t.decimals!=='') ? t.decimals : cfg.decimals;
     const suf = (t.suffix!=null && t.suffix!=='') ? t.suffix : cfg.suffix;
     const col = t.color || cfg.accentColor;
+    if(t.pct){ const dec = (t.decimals!=null && t.decimals!=='') ? +t.decimals : 0;   // fraction (0.98) -> percent: x100, append %
+      return { name, valBody: fmtNum(k.raw*100, dec, false), suf:'%', col }; }
     const valBody = (decRaw==='tableau') ? esc(k.fmt) : fmtNum(k.raw, +decRaw||0, cfg.thousands);
     return { name, valBody, suf, col };
   }
@@ -299,12 +301,14 @@
           <input class="tn" type="text" placeholder="rename" value="${esc(t.name||'')}">
           <input class="ts" type="text" placeholder="unit" value="${esc(t.suffix||'')}">
           <input class="td" type="number" placeholder="dec" value="${t.decimals!=null?t.decimals:''}">
-        </div>`;
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font:500 11px 'Segoe UI';color:#666;cursor:pointer"><input type="checkbox" class="tpct"${t.pct?' checked':''}> Show as % (×100) — for ratios like 0.98 → 98%</label>`;
       const set=(prop,val)=>{ cfg.tiles[field]=cfg.tiles[field]||{}; cfg.tiles[field][prop]=val; saveCfg(); redraw(); };
       row.querySelector('.tc').addEventListener('input',e=>set('color',e.target.value));
       row.querySelector('.tn').addEventListener('input',e=>set('name',e.target.value));
       row.querySelector('.ts').addEventListener('input',e=>set('suffix',e.target.value));
       row.querySelector('.td').addEventListener('input',e=>set('decimals',e.target.value));
+      row.querySelector('.tpct').addEventListener('change',e=>set('pct',e.target.checked));
       box.appendChild(row);
     });
   }
