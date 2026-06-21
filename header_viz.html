@@ -19,7 +19,7 @@
   .hide{display:none!important}
 
   .h-left{position:relative;z-index:2;min-width:0}
-  .h-eyebrow{font-weight:700;letter-spacing:.22em;text-transform:uppercase;margin-bottom:11px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .h-eyebrow{font-weight:700;letter-spacing:.22em;margin-bottom:11px}
   .h-name{line-height:.98;letter-spacing:-.015em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .h-sub{margin-top:11px;display:flex;gap:8px;flex-wrap:wrap}
   .pill{font-weight:600;padding:6px 12px;border-radius:999px;display:flex;align-items:center;gap:7px;white-space:nowrap}
@@ -31,7 +31,6 @@
   .h-badges{display:flex;gap:8px;margin-top:14px;justify-content:flex-end;flex-wrap:wrap}
   .spectrum{position:absolute;left:0;right:0;bottom:0;height:4px;z-index:1;background:linear-gradient(90deg,#4E79A7,#59A14F,#B07AA1,#F28E2B,#E15759)}
 
-  /* panel — dialog only */
   body.dialog{display:block}
   body.dialog #stage{display:none}
   #panel{display:none}
@@ -60,8 +59,7 @@
   .sw input:checked + i::after{transform:translateX(15px)}
   .muted{color:var(--muted);font-size:11px;font-weight:400}
   .styles{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
-  .styt{border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;font:600 11px 'Segoe UI';color:#555;transition:.12s}
-  .styt:hover{border-color:var(--blue)}
+  .styt{border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;font:600 11px 'Segoe UI';color:#555}
   .styt.on{border-color:var(--blue);box-shadow:0 0 0 2px rgba(78,121,167,.15)}
   .styt .sw2{display:block;height:20px;border-radius:5px;margin-bottom:5px}
   .pfoot{flex:0 0 auto;padding:10px 14px;border-top:1px solid var(--line)}
@@ -81,7 +79,6 @@
       <button data-t="bg">Background</button>
       <button data-t="colour">Colour</button>
       <button data-t="layout">Layout</button>
-      <button data-t="labels">Labels</button>
     </div>
     <div class="pbody">
       <div class="tab on" id="t-style"><div class="grp"><h4>Style preset</h4><div class="styles" id="styles"></div></div></div>
@@ -112,15 +109,11 @@
           <option value="Georgia, 'Times New Roman', serif">Georgia</option>
           <option value="'Benton Sans','Segoe UI',sans-serif">Benton Sans</option>
           <option value="Arial, Helvetica, sans-serif">Arial</option></select></label>
-      </div></div>
-
-      <div class="tab" id="t-labels"><div class="grp"><h4>Labels</h4>
+      </div>
+      <div class="grp"><h4>Labels</h4>
         <label class="row">Score suffix <input type="text" id="hScoreMax" style="max-width:80px" placeholder="/100"></label>
-        <label class="row">Rank label <input type="text" id="hRankLabel" style="max-width:90px" placeholder="Rank"></label>
-        <label class="row">Rank suffix <input type="text" id="hRankSuffix" style="max-width:90px" placeholder="of 25"></label>
-        <label class="row">Confidence label <input type="text" id="hConfLabel" style="max-width:100px" placeholder="Confidence"></label>
-        <label class="row">Confidence dot <span class="sw"><input type="checkbox" id="hConfDot"><i></i></span></label>
-        <label class="row">Eyebrow UPPERCASE <span class="sw"><input type="checkbox" id="hDateUpper"><i></i></span></label>
+        <label class="row">Eyebrow UPPERCASE <span class="sw"><input type="checkbox" id="hEyebrowUpper"><i></i></span></label>
+        <label class="row">Confidence dot on field <input type="text" id="hConfMatch" style="max-width:90px" placeholder="conf"></label>
       </div></div>
     </div>
     <div class="pfoot" id="pfoot" style="display:none"><button id="pDone">Done</button></div>
@@ -136,8 +129,8 @@
   const RANGES = [['hNameSize','nameSize','px'],['hScoreSize','scoreSize','px'],['hPad','padding','px'],['hRadius','radius','px']];
   const COLORS = [['hBg1','bg1'],['hBg2','bg2'],['hText','textColor'],['hSub','subColor'],['hScoreColor','scoreColor'],['hBadgeBg','badgeBg'],['hBadgeText','badgeText']];
   const SELECTS= [['hBgStyle','bgStyle'],['hScoreSide','scoreSide'],['hFont','fontFamily']];
-  const TOGGLES= [['hSpectrum','spectrum'],['hConfDot','confDot'],['hDateUpper','dateUpper']];
-  const TEXTS  = [['hScoreMax','scoreMax'],['hRankLabel','rankLabel'],['hRankSuffix','rankSuffix'],['hConfLabel','confLabel']];
+  const TOGGLES= [['hSpectrum','spectrum'],['hEyebrowUpper','eyebrowUpper']];
+  const TEXTS  = [['hScoreMax','scoreMax'],['hConfMatch','confMatch']];
 
   const PRESETS = {
     'Navy gold':{sw:'linear-gradient(135deg,#0C1E36,#102845)',o:{bgStyle:'gradient',bg1:'#0C1E36',bg2:'#102845',textColor:'#ffffff',subColor:'#E7D5A8',scoreColor:'#C9A227',badgeBg:'#1b3454',badgeText:'#dfe6f0',spectrum:true}},
@@ -151,8 +144,7 @@
     preset:'Navy gold', bgStyle:'gradient', bg1:'#0C1E36', bg2:'#102845', spectrum:true,
     textColor:'#ffffff', subColor:'#E7D5A8', scoreColor:'#C9A227', badgeBg:'#1b3454', badgeText:'#dfe6f0',
     nameSize:46, scoreSize:84, padding:30, radius:18, scoreSide:'right',
-    fontFamily:"'Segoe UI', Tahoma, sans-serif",
-    scoreMax:'/100', rankLabel:'Rank', rankSuffix:'', confLabel:'Confidence', confDot:true, dateUpper:true
+    fontFamily:"'Segoe UI', Tahoma, sans-serif", scoreMax:'/100', eyebrowUpper:true, confMatch:'conf'
   };
   let cfg = JSON.parse(JSON.stringify(DEFAULTS));
 
@@ -175,7 +167,7 @@
   function openConfig(){
     const url = location.href.split('#')[0].split('?')[0] + '?dialog=1';
     let style; try{ style=tableau.DialogStyle.Modeless; }catch(_){ style='modeless'; }
-    try{ tableau.extensions.ui.displayDialogAsync(url,'x',{width:320,height:560,dialogStyle:style}).then(()=>{}).catch(()=>{}); }catch(_){}
+    try{ tableau.extensions.ui.displayDialogAsync(url,'x',{width:320,height:540,dialogStyle:style}).then(()=>{}).catch(()=>{}); }catch(_){}
   }
   function initDialog(){
     document.body.classList.add('dialog');
@@ -197,16 +189,25 @@
     try{
       const spec = await worksheet.getVisualSpecificationAsync();
       const marks = spec.marksSpecifications[spec.activeMarksSpecificationIndex];
-      const fieldBy={};
-      (marks.encodings||[]).forEach(enc=>{ const f=enc.field||(enc.fields&&enc.fields[0]); if(f) fieldBy[enc.id]=f.name; });
+      let nameF=null, scoreF=null, metricFs=[], contextFs=[];
+      (marks.encodings||[]).forEach(enc=>{
+        const fs = (enc.fields && enc.fields.length) ? enc.fields : (enc.field ? [enc.field] : []);
+        const names = fs.map(f=>f.name);
+        if(enc.id==='name')        nameF = names[0]||null;
+        else if(enc.id==='score')  scoreF = names[0]||null;
+        else if(enc.id==='metrics') metricFs = names;
+        else if(enc.id==='context') contextFs = names;
+      });
       const dt = await fetchTable(worksheet);
       if(!dt.data.length) return showMsg('No data','Filter the sheet to one agent.');
-      const row = dt.data[0];
-      const get = id=>{ const fn=fieldBy[id]; if(!fn) return null; const ci=dt.columns.findIndex(c=>c.fieldName===fn); if(ci<0) return null;
-        const cell=row[ci]; const raw=typeof cell.value==='number'?cell.value:parseFloat(cell.formattedValue); return { fmt:cell.formattedValue, raw }; };
-      const vals = { name:get('name'), score:get('score'), rank:get('rank'), conf:get('confidence'), team:get('team'), date:get('date') };
-      if(!vals.name || !vals.score) return showMsg('Assign Name &amp; Score','Put a dimension on <span class="enc">Name</span> and a measure on <span class="enc">Score</span>. Rank, Confidence, Date &amp; Team are optional.');
-      draw(vals);
+      const row=dt.data[0];
+      const cell=fn=>{ if(!fn) return null; const ci=dt.columns.findIndex(c=>c.fieldName===fn); if(ci<0) return null;
+        const c=row[ci]; return { fmt:c.formattedValue, raw: typeof c.value==='number'?c.value:parseFloat(c.formattedValue) }; };
+      const name=cell(nameF), score=cell(scoreF);
+      if(!name || !score) return showMsg('Assign Name &amp; Score','Put a dimension on <span class="enc">Name</span> and a measure on <span class="enc">Score</span>. Metrics &amp; Context are optional.');
+      const metrics = metricFs.map(fn=>({ label:fn, ...cell(fn) })).filter(m=>m && m.fmt!=null);
+      const context = contextFs.map(fn=>({ label:fn, ...cell(fn) })).filter(c=>c && c.fmt!=null && c.fmt!=='');
+      draw({name, score, metrics, context});
     }catch(e){ showMsg('Error', esc(String(e&&e.message||e))); }
   }
   async function fetchTable(ws){
@@ -218,12 +219,20 @@
   function pill(html){ return `<span class="pill" style="background:${cfg.badgeBg};color:${cfg.badgeText}">${html}</span>`; }
   function draw(v){
     const bg = cfg.bgStyle==='gradient' ? `linear-gradient(135deg,${cfg.bg1},${cfg.bg2})` : cfg.bg1;
-    const eyebrow = v.date ? `<div class="h-eyebrow" style="color:${cfg.subColor};font-size:${Math.max(10,Math.round(cfg.nameSize*0.23))}px${cfg.dateUpper?'':';text-transform:none'}">${esc(v.date.fmt)}</div>` : '';
-    const teamPill = v.team ? pill(`Team · <b class="mono">${esc(v.team.fmt)}</b>`) : '';
-    const rankPill = v.rank ? pill(`${esc(cfg.rankLabel)} <span class="mono">${esc(v.rank.fmt)}${cfg.rankSuffix?' '+esc(cfg.rankSuffix):''}</span>`) : '';
-    const confPill = v.conf ? pill(`${cfg.confDot?`<span class="gdot" style="background:${confColor(v.conf.raw)}"></span>`:''}${esc(cfg.confLabel)} <span class="mono">${esc(v.conf.fmt)}</span>`) : '';
-    const left = `<div class="h-left">${eyebrow}<div class="h-name" style="color:${cfg.textColor};font-size:${cfg.nameSize}px">${esc(v.name.fmt)}</div>${teamPill?`<div class="h-sub">${teamPill}</div>`:''}</div>`;
-    const right = `<div class="h-right"><div class="h-score" style="color:${cfg.scoreColor};font-size:${cfg.scoreSize}px">${esc(v.score.fmt)}${cfg.scoreMax?`<span class="of">${esc(cfg.scoreMax)}</span>`:''}</div>${(rankPill||confPill)?`<div class="h-badges">${rankPill}${confPill}</div>`:''}</div>`;
+    const eyebrowF = v.context[0];                       // 1st Context field = eyebrow (date/period)
+    const tagFs = v.context.slice(1);                    // rest = tags (team, ...)
+    const eyebrow = eyebrowF ? `<div class="h-eyebrow" style="color:${cfg.subColor};font-size:${Math.max(10,Math.round(cfg.nameSize*0.23))}px;text-transform:${cfg.eyebrowUpper?'uppercase':'none'}">${esc(eyebrowF.fmt)}</div>` : '';
+    const tagPills = tagFs.map(t=>pill(`<b class="mono">${esc(t.fmt)}</b>`)).join('');
+    const cm = (cfg.confMatch||'').toLowerCase();
+    const badges = v.metrics.map(m=>{
+      const isConf = cm && m.label.toLowerCase().includes(cm) && !isNaN(m.raw);
+      const dot = isConf ? `<span class="gdot" style="background:${confColor(m.raw)}"></span>` : '';
+      return pill(`${dot}${esc(m.label)} <span class="mono">${esc(m.fmt)}</span>`);
+    }).join('');
+
+    const left = `<div class="h-left">${eyebrow}<div class="h-name" style="color:${cfg.textColor};font-size:${cfg.nameSize}px">${esc(v.name.fmt)}</div>${tagPills?`<div class="h-sub">${tagPills}</div>`:''}</div>`;
+    const right = `<div class="h-right"><div class="h-score" style="color:${cfg.scoreColor};font-size:${cfg.scoreSize}px">${esc(v.score.fmt)}${cfg.scoreMax?`<span class="of">${esc(cfg.scoreMax)}</span>`:''}</div>${badges?`<div class="h-badges">${badges}</div>`:''}</div>`;
+
     const hdr=$('hdr');
     hdr.style.cssText=`background:${bg};border-radius:${cfg.radius}px;padding:${cfg.padding}px ${cfg.padding+8}px;font-family:${cfg.fontFamily}`;
     hdr.innerHTML = (cfg.scoreSide==='left' ? right+left : left+right) + (cfg.spectrum?'<div class="spectrum"></div>':'');
