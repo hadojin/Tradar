@@ -111,6 +111,7 @@
       <div class="tab" id="t-layout"><div class="grp"><h4>Sizes &amp; layout</h4>
         <div class="row col"><span>Name size <span class="muted" id="hNameSizeV"></span></span><input type="range" id="hNameSize" min="20" max="72" step="1"></div>
         <div class="row col"><span>Score size <span class="muted" id="hScoreSizeV"></span></span><input type="range" id="hScoreSize" min="36" max="130" step="2"></div>
+        <div class="row col"><span>Suffix size (the /100) <span class="muted" id="hSuffixSizeV"></span></span><input type="range" id="hSuffixSize" min="8" max="90" step="1"></div>
         <div class="row col"><span>Padding <span class="muted" id="hPadV"></span></span><input type="range" id="hPad" min="14" max="56" step="2"></div>
         <div class="row col"><span>Corner radius <span class="muted" id="hRadiusV"></span></span><input type="range" id="hRadius" min="0" max="32" step="1"></div>
         <label class="row">Score side <select id="hScoreSide"><option value="right">Right</option><option value="left">Left</option></select></label>
@@ -137,7 +138,7 @@
   const DIALOG = new URLSearchParams(location.search).get('dialog')==='1';
   let worksheet=null, last=null, lastFields=[];
 
-  const RANGES = [['hNameSize','nameSize','px'],['hScoreSize','scoreSize','px'],['hPad','padding','px'],['hRadius','radius','px']];
+  const RANGES = [['hNameSize','nameSize','px'],['hScoreSize','scoreSize','px'],['hSuffixSize','suffixSize','px'],['hPad','padding','px'],['hRadius','radius','px']];
   const COLORS = [['hBg1','bg1'],['hBg2','bg2'],['hText','textColor'],['hSub','subColor'],['hScoreColor','scoreColor'],['hBadgeBg','badgeBg'],['hBadgeText','badgeText']];
   const SELECTS= [['hBgStyle','bgStyle'],['hScoreSide','scoreSide'],['hFont','fontFamily'],['hDecimals','decimals']];
   const TOGGLES= [['hSpectrum','spectrum'],['hEyebrowUpper','eyebrowUpper']];
@@ -154,7 +155,7 @@
   const DEFAULTS = {
     preset:'Navy gold', bgStyle:'gradient', bg1:'#0C1E36', bg2:'#102845', spectrum:true,
     textColor:'#ffffff', subColor:'#E7D5A8', scoreColor:'#C9A227', badgeBg:'#1b3454', badgeText:'#dfe6f0',
-    nameSize:46, scoreSize:84, padding:30, radius:18, scoreSide:'right',
+    nameSize:46, scoreSize:84, suffixSize:30, padding:30, radius:18, scoreSide:'right',
     fontFamily:"'Segoe UI', Tahoma, sans-serif", decimals:'0', scoreMax:'/100', eyebrowUpper:true, confMatch:'conf',
     fields:{}
   };
@@ -263,7 +264,7 @@
 
     const eyebrow = eyebrowTxt ? `<div class="h-eyebrow" style="color:${cfg.subColor};font-size:${Math.max(10,Math.round(cfg.nameSize*0.23))}px;text-transform:${cfg.eyebrowUpper?'uppercase':'none'}">${eyebrowTxt}</div>` : '';
     const left = `<div class="h-left">${eyebrow}<div class="h-name" style="color:${cfg.textColor};font-size:${cfg.nameSize}px">${esc(v.name.fmt)}</div>${tags?`<div class="h-sub">${tags}</div>`:''}</div>`;
-    const right = `<div class="h-right"><div class="h-score" style="color:${cfg.scoreColor};font-size:${cfg.scoreSize}px">${fmtVal(v.score)}${cfg.scoreMax?`<span class="of">${esc(cfg.scoreMax)}</span>`:''}</div>${badges?`<div class="h-badges">${badges}</div>`:''}</div>`;
+    const right = `<div class="h-right"><div class="h-score" style="color:${cfg.scoreColor};font-size:${cfg.scoreSize}px">${fmtVal(v.score)}${cfg.scoreMax?`<span class="of" style="font-size:${cfg.suffixSize}px">${esc(cfg.scoreMax)}</span>`:''}</div>${badges?`<div class="h-badges">${badges}</div>`:''}</div>`;
 
     const hdr=$('hdr');
     hdr.style.cssText=`background:${bg};border-radius:${cfg.radius}px;padding:${cfg.padding}px ${cfg.padding+8}px;font-family:${cfg.fontFamily}`;
