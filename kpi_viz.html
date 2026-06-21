@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KPI Tiles (Viz)</title>
+<script src="tableau.extensions.1.latest.min.js"></script>
+<style>
+  :root{ --blue:#4E79A7; --blue-deep:#3B5E84; --ink:#2b2b2b; --muted:#7a7a7a; --line:#e6e6e6; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Segoe UI',Tahoma,sans-serif;color:var(--ink);background:#fff;display:flex;overflow:hidden}
+  #stage{flex:1;position:relative;display:flex;min-height:0}
+  #scroll{flex:1;overflow:auto;padding:12px;min-width:0}
+  #grid{display:grid}
+  #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:#fff}
+  .msg{text-align:center;color:var(--muted);font:400 13px 'Segoe UI';max-width:300px;line-height:1.55}
+  .msg b{color:var(--ink);display:block;margin-bottom:6px;font:600 14px 'Segoe UI'}
+  .msg .enc{color:var(--blue-deep);font-weight:600}
+  .hide{display:none!important}
+
+  /* tile */
+  .tile{position:relative;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+  .tile .lab{display:flex;align-items:center;gap:7px}
+  .tile .ldot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .tile .num{line-height:1;font-weight:700}
+  .tile .num .pre,.tile .num .suf{font-size:.5em;font-weight:600;color:var(--muted)}
+
+  #gear{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:7px;border:1px solid var(--line);background:#fff;color:#888;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:15px;z-index:6}
+  #gear:hover{color:var(--blue);border-color:var(--blue)}
+
+  #panel{position:absolute;top:0;right:0;height:100%;width:268px;background:#fff;border-left:1px solid var(--line);box-shadow:-12px 0 30px -18px rgba(0,0,0,.3);z-index:7;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+  #panel.open{transform:none}
+  .phead{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .phead h3{font:700 13px 'Segoe UI'}
+  .phead .x{cursor:pointer;color:#999;font-size:18px;border:0;background:none}
+  .pbody{overflow-y:auto;padding:4px 14px 18px}
+  .grp{margin-top:13px}
+  .grp h4{font:700 9.5px 'Segoe UI';letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;padding-bottom:4px;border-bottom:1px dashed var(--line)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;font:500 12px 'Segoe UI';color:#333}
+  .row.col{flex-direction:column;align-items:stretch;gap:4px}
+  .row input[type=range]{width:120px}
+  .row input[type=number]{width:58px;font:500 12px 'Segoe UI';padding:4px 6px;border:1px solid #cfcfcf;border-radius:5px}
+  .row input[type=text]{font:500 12px 'Segoe UI';padding:5px 7px;border:1px solid #cfcfcf;border-radius:5px;width:100%}
+  .row input[type=color]{width:30px;height:22px;border:1px solid #cfcfcf;border-radius:5px;padding:0;background:#fff;cursor:pointer}
+  .row select{max-width:140px;font:500 12px 'Segoe UI';padding:4px 6px;border:1px solid #cfcfcf;border-radius:5px;background:#fff;cursor:pointer}
+  .sw{position:relative;width:34px;height:19px;flex:0 0 auto;cursor:pointer}
+  .sw input{display:none}
+  .sw i{position:absolute;inset:0;background:#d2d2d2;border-radius:999px;transition:background .16s}
+  .sw i::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .16s}
+  .sw input:checked + i{background:var(--blue)}
+  .sw input:checked + i::after{transform:translateX(15px)}
+  .muted{color:var(--muted);font-size:11px;font-weight:400}
+  /* per-tile editor */
+  .trow{border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:7px}
+  .trow .th{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+  .trow .th .fn{font:600 11px 'Consolas',monospace;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .trow .tg{display:grid;grid-template-columns:1fr 52px 46px;gap:5px}
+  .trow input{font:500 11px 'Segoe UI';padding:4px 6px;border:1px solid #d6d6d6;border-radius:4px;width:100%}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="scroll"><div id="grid" class="hide"></div></div>
+    <div id="msg"><div class="msg" id="msgText"><b>Loading…</b>Starting KPI tiles.</div></div>
+    <button id="gear" title="Settings">&#9881;</button>
+  </div>
+
+  <div id="panel">
+    <div class="phead"><h3>KPI settings</h3><button class="x" id="pClose">&times;</button></div>
+    <div class="pbody">
+      <div class="grp"><h4>Layout</h4>
+        <label class="row">Columns <select id="kColumns"><option value="auto">Auto-fit</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
+        <div class="row col"><span>Min tile width <span class="muted" id="kMinWV"></span></span><input type="range" id="kMinW" min="90" max="320" step="10"></div>
+        <div class="row col"><span>Gap <span class="muted" id="kGapV"></span></span><input type="range" id="kGap" min="0" max="28" step="1"></div>
+        <div class="row col"><span>Padding <span class="muted" id="kPaddingV"></span></span><input type="range" id="kPadding" min="6" max="30" step="1"></div>
+        <div class="row col"><span>Corner radius <span class="muted" id="kRadiusV"></span></span><input type="range" id="kRadius" min="0" max="22" step="1"></div>
+        <div class="row col"><span>Min height <span class="muted" id="kMinHV"></span></span><input type="range" id="kMinH" min="60" max="200" step="4"></div>
+        <label class="row">Align <select id="kAlign"><option value="left">Left</option><option value="center">Center</option></select></label>
+      </div>
+      <div class="grp"><h4>Typography</h4>
+        <label class="row">Font <select id="kFont">
+          <option value="'Segoe UI', Tahoma, sans-serif">Segoe UI</option>
+          <option value="'Benton Sans','Segoe UI',sans-serif">Benton Sans</option>
+          <option value="Arial, Helvetica, sans-serif">Arial</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="Tahoma, Geneva, sans-serif">Tahoma</option></select></label>
+        <div class="row col"><span>Number size <span class="muted" id="kNumSizeV"></span></span><input type="range" id="kNumSize" min="16" max="60" step="1"></div>
+        <div class="row col"><span>Label size <span class="muted" id="kLabelSizeV"></span></span><input type="range" id="kLabelSize" min="8" max="18" step="1"></div>
+        <label class="row">Label case <select id="kLabelCase"><option value="upper">UPPERCASE</option><option value="none">As-is</option><option value="title">Title</option></select></label>
+      </div>
+      <div class="grp"><h4>Colours</h4>
+        <label class="row">Number <input type="color" id="kNumColor"></label>
+        <label class="row">Label <input type="color" id="kLabelColor"></label>
+        <label class="row">Tile background <input type="color" id="kTileBg"></label>
+        <label class="row">Border <input type="color" id="kBorder"></label>
+        <label class="row">Default accent <input type="color" id="kAccent"></label>
+        <label class="row">Accent style <select id="kAccentStyle"><option value="left">Left bar</option><option value="top">Top bar</option><option value="dot">Dot</option><option value="none">None</option></select></label>
+      </div>
+      <div class="grp"><h4>Number format</h4>
+        <label class="row">Decimals <select id="kDecimals"><option value="tableau">Use Tableau</option><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
+        <label class="row">Thousands separator <span class="sw"><input type="checkbox" id="kThousands"><i></i></span></label>
+        <label class="row">Prefix <input type="text" id="kPrefix" style="max-width:90px" placeholder="$"></label>
+        <label class="row">Suffix <input type="text" id="kSuffix" style="max-width:90px" placeholder="%"></label>
+      </div>
+      <div class="grp"><h4>Per-tile</h4>
+        <div class="muted" style="margin-bottom:6px">Rename, set a unit, decimals &amp; colour for each measure.</div>
+        <div id="tiles"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+"use strict";
+(function(){
+  const $ = id => document.getElementById(id);
+  let worksheet=null, lastKpis=null, lastSig='';
+
+  const TOGGLES = [['kThousands','thousands']];
+  const RANGES  = [['kMinW','minTileW','px'],['kGap','gap','px'],['kPadding','padding','px'],['kRadius','radius','px'],['kMinH','minHeight','px'],['kNumSize','numSize','px'],['kLabelSize','labelSize','px']];
+  const COLORS  = [['kNumColor','numColor'],['kLabelColor','labelColor'],['kTileBg','tileBg'],['kBorder','borderColor'],['kAccent','accentColor']];
+  const SELECTS = [['kColumns','columns'],['kAlign','align'],['kFont','fontFamily'],['kLabelCase','labelCase'],['kAccentStyle','accentStyle'],['kDecimals','decimals']];
+
+  const DEFAULTS = {
+    columns:'auto', minTileW:150, gap:12, padding:14, radius:13, minHeight:92, align:'left',
+    fontFamily:"'Segoe UI', Tahoma, sans-serif", numSize:32, labelSize:11, labelCase:'upper',
+    numColor:'#16294f', labelColor:'#7a869a', tileBg:'#ffffff', borderColor:'#e6e8ee', accentColor:'#4E79A7', accentStyle:'left',
+    decimals:'tableau', thousands:true, prefix:'', suffix:'',
+    tiles:{}
+  };
+  let cfg = JSON.parse(JSON.stringify(DEFAULTS));
+
+  function loadCfg(){ try{ const r=tableau.extensions.settings.get('kpiCfg'); if(r) cfg={...JSON.parse(JSON.stringify(DEFAULTS)),...JSON.parse(r)}; if(!cfg.tiles)cfg.tiles={}; }catch(_){} }
+  let saveT=null;
+  function saveCfg(){ try{ tableau.extensions.settings.set('kpiCfg', JSON.stringify(cfg));
+    clearTimeout(saveT); saveT=setTimeout(()=>{ try{ tableau.extensions.settings.saveAsync(); }catch(_){} }, 300); }catch(_){} }
+
+  /* boot */
+  $('gear').onclick=()=>$('panel').classList.add('open');
+  $('pClose').onclick=()=>$('panel').classList.remove('open');
+  bindControls();
+  tableau.extensions.initializeAsync().then(()=>{
+    worksheet = tableau.extensions.worksheetContent.worksheet;
+    loadCfg(); syncControls();
+    worksheet.addEventListener(tableau.TableauEventType.SummaryDataChanged, render);
+    $('gear').style.display='flex';
+    render();
+  }).catch(e=>showMsg('Couldn’t start', esc(String(e&&e.message||e))));
+
+  /* render */
+  async function render(){
+    if(!worksheet) return;
+    try{
+      const dt = await fetchTable(worksheet);
+      const numCols = dt.columns.filter(c=>c.dataType==='float'||c.dataType==='int');
+      if(!numCols.length) return showMsg('Drop your measures','Put your KPI measures on the <span class="enc">Values</span> shelf — one tile per measure.');
+      const kpis = numCols.map(c=>{
+        let sum=0,nn=0,fmt=null;
+        dt.data.forEach(r=>{ const cell=r[c.index]; const v=cell.value; const num=typeof v==='number'?v:parseFloat(cell.formattedValue);
+          if(!isNaN(num)){ sum+=num; nn++; if(fmt===null) fmt=cell.formattedValue; } });
+        return { field:c.fieldName, raw: nn? sum/nn : 0, fmt: fmt!==null?fmt:'—' };
+      });
+      drawTiles(kpis);
+    }catch(e){ showMsg('Error', esc(String(e&&e.message||e))); }
+  }
+
+  async function fetchTable(ws){
+    if(ws.getSummaryDataReaderAsync){
+      const reader = await ws.getSummaryDataReaderAsync(undefined,{ignoreSelection:true});
+      const dt = await reader.getAllPagesAsync(); await reader.releaseAsync(); return dt;
+    }
+    return await ws.getSummaryDataAsync({maxRows:5000,ignoreSelection:true});
+  }
+
+  /* formatting */
+  function fmtNum(raw,dec,thousands){ let s=(+raw).toFixed(dec); if(thousands) s=s.replace(/\B(?=(\d{3})+(?!\d))/g,','); return s; }
+  function labelCase(s){ if(cfg.labelCase==='upper')return s.toUpperCase(); if(cfg.labelCase==='title')return s.replace(/\w\S*/g,w=>w[0].toUpperCase()+w.slice(1).toLowerCase()); return s; }
+  function resolveTile(k){
+    const t = cfg.tiles[k.field] || {};
+    const name = (t.name && t.name.trim()) ? t.name : labelCase(k.field.replace(/_/g,' '));
+    const decRaw = (t.decimals!=null && t.decimals!=='') ? t.decimals : cfg.decimals;
+    const suf = (t.suffix!=null && t.suffix!=='') ? t.suffix : cfg.suffix;
+    const col = t.color || cfg.accentColor;
+    const valBody = (decRaw==='tableau') ? esc(k.fmt) : fmtNum(k.raw, +decRaw||0, cfg.thousands);
+    return { name, valBody, suf, col };
+  }
+
+  /* draw */
+  function drawTiles(kpis){
+    lastKpis = kpis;
+    const grid=$('grid');
+    grid.style.gridTemplateColumns = cfg.columns==='auto' ? `repeat(auto-fit,minmax(${cfg.minTileW}px,1fr))` : `repeat(${cfg.columns},minmax(0,1fr))`;
+    grid.style.gap = cfg.gap+'px';
+    grid.innerHTML = kpis.map(k=>{
+      const r=resolveTile(k);
+      let tileStyle=`background:${cfg.tileBg};border:1px solid ${cfg.borderColor};border-radius:${cfg.radius}px;padding:${cfg.padding}px;min-height:${cfg.minHeight}px;text-align:${cfg.align};font-family:${cfg.fontFamily}`;
+      if(cfg.accentStyle==='left') tileStyle+=`;border-left:3px solid ${r.col}`;
+      if(cfg.accentStyle==='top')  tileStyle+=`;border-top:3px solid ${r.col}`;
+      const dot = cfg.accentStyle==='dot' ? `<span class="ldot" style="background:${r.col}"></span>` : '';
+      const labJ = cfg.align==='center'?'justify-content:center':'';
+      const pre = cfg.prefix?`<span class="pre">${esc(cfg.prefix)}</span>`:'';
+      const suf = r.suf?`<span class="suf">${esc(r.suf)}</span>`:'';
+      return `<div class="tile" style="${tileStyle}">
+        <div class="lab" style="${labJ};font-size:${cfg.labelSize}px;letter-spacing:.04em;font-weight:600;color:${cfg.labelColor}">${dot}${esc(r.name)}</div>
+        <div class="num" style="font-size:${cfg.numSize}px;color:${cfg.numColor}">${pre}${r.valBody}${suf}</div>
+      </div>`;
+    }).join('');
+    grid.classList.remove('hide'); $('msg').classList.add('hide');
+    buildTileEditor(kpis);
+  }
+  function redraw(){ if(lastKpis) drawTiles(lastKpis); }
+
+  /* per-tile editor (rebuild only when the measure set changes) */
+  function buildTileEditor(kpis){
+    const sig = kpis.map(k=>k.field).join('|'); if(sig===lastSig) return; lastSig=sig;
+    const box=$('tiles'); box.innerHTML='';
+    kpis.forEach(k=>{
+      const t = cfg.tiles[k.field] || {};
+      const row=document.createElement('div'); row.className='trow';
+      row.innerHTML=`<div class="th"><input type="color" class="tc" value="${t.color||cfg.accentColor}"><span class="fn">${esc(k.field)}</span></div>
+        <div class="tg">
+          <input class="tn" type="text" placeholder="rename" value="${esc(t.name||'')}">
+          <input class="ts" type="text" placeholder="unit" value="${esc(t.suffix||'')}">
+          <input class="td" type="number" placeholder="dec" value="${t.decimals!=null?t.decimals:''}">
+        </div>`;
+      const set=(prop,val)=>{ cfg.tiles[k.field]=cfg.tiles[k.field]||{}; cfg.tiles[k.field][prop]=val; saveCfg(); redraw(); };
+      row.querySelector('.tc').addEventListener('input',e=>set('color',e.target.value));
+      row.querySelector('.tn').addEventListener('input',e=>set('name',e.target.value));
+      row.querySelector('.ts').addEventListener('input',e=>set('suffix',e.target.value));
+      row.querySelector('.td').addEventListener('input',e=>set('decimals',e.target.value));
+      box.appendChild(row);
+    });
+  }
+
+  /* controls */
+  function bindControls(){
+    TOGGLES.forEach(([id,k])=>$(id).addEventListener('change',e=>{cfg[k]=e.target.checked;saveCfg();redraw();}));
+    RANGES.forEach(([id,k,suf])=>$(id).addEventListener('input',e=>{cfg[k]=+e.target.value;const v=$(id+'V');if(v)v.textContent=e.target.value+suf;saveCfg();redraw();}));
+    COLORS.forEach(([id,k])=>$(id).addEventListener('input',e=>{cfg[k]=e.target.value;saveCfg();redraw();}));
+    SELECTS.forEach(([id,k])=>$(id).addEventListener('change',e=>{cfg[k]=e.target.value;saveCfg();redraw();}));
+    $('kPrefix').addEventListener('input',e=>{cfg.prefix=e.target.value;saveCfg();redraw();});
+    $('kSuffix').addEventListener('input',e=>{cfg.suffix=e.target.value;saveCfg();redraw();});
+  }
+  function syncControls(){
+    TOGGLES.forEach(([id,k])=>$(id).checked=cfg[k]);
+    RANGES.forEach(([id,k,suf])=>{$(id).value=cfg[k];const v=$(id+'V');if(v)v.textContent=cfg[k]+suf;});
+    COLORS.forEach(([id,k])=>$(id).value=cfg[k]);
+    SELECTS.forEach(([id,k])=>$(id).value=cfg[k]);
+    $('kPrefix').value=cfg.prefix; $('kSuffix').value=cfg.suffix;
+  }
+
+  /* utils */
+  function showMsg(t,b){ $('grid').classList.add('hide'); $('msg').classList.remove('hide'); $('msgText').innerHTML='<b>'+esc(t)+'</b>'+(b||''); }
+  function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+})();
+</script>
+</body>
+</html>
