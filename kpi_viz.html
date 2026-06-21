@@ -88,12 +88,14 @@
       <div class="tab on" id="t-style"><div class="grp"><h4>Style preset</h4><div class="styles" id="styles"></div></div></div>
 
       <div class="tab" id="t-layout"><div class="grp"><h4>Layout</h4>
+        <div class="muted" style="margin-bottom:8px;line-height:1.5"><b>Columns</b> — Auto-fit wraps tiles across the width (using <i>Min tile width</i>), or pick a fixed number (e.g. 4 = a row of four). <b>Fill height</b> — stretches tiles to fill the area; turn it ON if they scroll or look too short.</div>
         <label class="row">Columns <select id="kColumns"><option value="auto">Auto-fit</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
-        <div class="row col"><span>Min tile width <span class="muted" id="kMinWV"></span></span><input type="range" id="kMinW" min="90" max="320" step="10"></div>
+        <label class="row">Fill height <span class="sw"><input type="checkbox" id="kFillHeight"><i></i></span></label>
+        <div class="row col"><span>Min tile width <span class="muted">(auto-fit only)</span> <span class="muted" id="kMinWV"></span></span><input type="range" id="kMinW" min="80" max="340" step="10"></div>
         <div class="row col"><span>Gap <span class="muted" id="kGapV"></span></span><input type="range" id="kGap" min="0" max="28" step="1"></div>
         <div class="row col"><span>Padding <span class="muted" id="kPaddingV"></span></span><input type="range" id="kPadding" min="6" max="30" step="1"></div>
         <div class="row col"><span>Corner radius <span class="muted" id="kRadiusV"></span></span><input type="range" id="kRadius" min="0" max="22" step="1"></div>
-        <div class="row col"><span>Min height <span class="muted" id="kMinHV"></span></span><input type="range" id="kMinH" min="56" max="200" step="4"></div>
+        <div class="row col"><span>Min height <span class="muted" id="kMinHV"></span></span><input type="range" id="kMinH" min="36" max="200" step="4"></div>
         <label class="row">Align <select id="kAlign"><option value="left">Left</option><option value="center">Center</option></select></label>
       </div></div>
 
@@ -116,6 +118,7 @@
         <label class="row">Border <input type="color" id="kBorder"></label>
         <label class="row">Default accent <input type="color" id="kAccent"></label>
         <label class="row">Accent style <select id="kAccentStyle"><option value="left">Left bar</option><option value="top">Top bar</option><option value="dot">Dot</option><option value="none">None</option></select></label>
+        <div class="row col"><span>Accent thickness <span class="muted" id="kAccentWV"></span></span><input type="range" id="kAccentW" min="0" max="16" step="1"></div>
       </div></div>
 
       <div class="tab" id="t-format"><div class="grp"><h4>Number format</h4>
@@ -140,8 +143,8 @@
   const DIALOG = new URLSearchParams(location.search).get('dialog')==='1';
   let worksheet=null, lastKpis=null, lastFields=[];
 
-  const TOGGLES = [['kThousands','thousands']];
-  const RANGES  = [['kMinW','minTileW','px'],['kGap','gap','px'],['kPadding','padding','px'],['kRadius','radius','px'],['kMinH','minHeight','px'],['kNumSize','numSize','px'],['kLabelSize','labelSize','px']];
+  const TOGGLES = [['kThousands','thousands'],['kFillHeight','fillHeight']];
+  const RANGES  = [['kMinW','minTileW','px'],['kGap','gap','px'],['kPadding','padding','px'],['kRadius','radius','px'],['kMinH','minHeight','px'],['kNumSize','numSize','px'],['kLabelSize','labelSize','px'],['kAccentW','accentWidth','px']];
   const COLORS  = [['kNumColor','numColor'],['kLabelColor','labelColor'],['kTileBg','tileBg'],['kBorder','borderColor'],['kAccent','accentColor']];
   const SELECTS = [['kColumns','columns'],['kAlign','align'],['kFont','fontFamily'],['kLabelCase','labelCase'],['kAccentStyle','accentStyle'],['kDecimals','decimals']];
 
@@ -158,7 +161,7 @@
     preset:'Card', columns:'auto', minTileW:150, gap:12, padding:14, radius:13, minHeight:92, align:'left',
     fontFamily:"'Segoe UI', Tahoma, sans-serif", numSize:32, labelSize:11, labelCase:'upper',
     numColor:'#16294f', labelColor:'#7a869a', tileBg:'#ffffff', borderColor:'#e6e8ee', accentColor:'#4E79A7', accentStyle:'left',
-    decimals:'tableau', thousands:true, prefix:'', suffix:'', tiles:{}
+    decimals:'tableau', thousands:true, prefix:'', suffix:'', accentWidth:3, fillHeight:false, tiles:{}
   };
   let cfg = JSON.parse(JSON.stringify(DEFAULTS));
 
@@ -227,7 +230,7 @@
   function labelCase(s){ if(cfg.labelCase==='upper')return s.toUpperCase(); if(cfg.labelCase==='title')return s.replace(/\w\S*/g,w=>w[0].toUpperCase()+w.slice(1).toLowerCase()); return s; }
   function resolveTile(k){
     const t = cfg.tiles[k.field] || {};
-    const name = (t.name && t.name.trim()) ? t.name : labelCase(k.field.replace(/_/g,' '));
+    const name = (t.name && t.name.trim()) ? t.name : labelCase(k.field.replace(/^[A-Za-z]+\((.*)\)$/,'$1').replace(/_/g,' '));
     const decRaw = (t.decimals!=null && t.decimals!=='') ? t.decimals : cfg.decimals;
     const suf = (t.suffix!=null && t.suffix!=='') ? t.suffix : cfg.suffix;
     const col = t.color || cfg.accentColor;
@@ -239,11 +242,14 @@
     const grid=$('grid');
     grid.style.gridTemplateColumns = cfg.columns==='auto' ? `repeat(auto-fit,minmax(${cfg.minTileW}px,1fr))` : `repeat(${cfg.columns},minmax(0,1fr))`;
     grid.style.gap = cfg.gap+'px';
+    grid.style.height = cfg.fillHeight ? '100%' : 'auto';
+    grid.style.gridAutoRows = cfg.fillHeight ? '1fr' : 'auto';
+    const aw = +cfg.accentWidth||0;
     grid.innerHTML = kpis.map(k=>{
       const r=resolveTile(k);
       let st=`background:${cfg.tileBg};border:1px solid ${cfg.borderColor};border-radius:${cfg.radius}px;padding:${cfg.padding}px;min-height:${cfg.minHeight}px;text-align:${cfg.align};font-family:${cfg.fontFamily}`;
-      if(cfg.accentStyle==='left') st+=`;border-left:3px solid ${r.col}`;
-      if(cfg.accentStyle==='top')  st+=`;border-top:3px solid ${r.col}`;
+      if(cfg.accentStyle==='left' && aw>0) st+=`;border-left:${aw}px solid ${r.col}`;
+      if(cfg.accentStyle==='top' && aw>0)  st+=`;border-top:${aw}px solid ${r.col}`;
       const dot = cfg.accentStyle==='dot' ? `<span class="ldot" style="background:${r.col}"></span>` : '';
       const labJ = cfg.align==='center'?'justify-content:center':'';
       const pre = cfg.prefix?`<span class="pre">${esc(cfg.prefix)}</span>`:'';
