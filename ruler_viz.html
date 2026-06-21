@@ -11,8 +11,8 @@
   html,body{height:100%}
   body{font-family:'Segoe UI',Tahoma,sans-serif;color:var(--ink);background:#fff;display:flex;overflow:hidden}
   #stage{flex:1;position:relative;display:flex;min-height:0}
-  #wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:16px 26px;min-width:0}
-  #ruler{position:relative;width:100%;max-width:640px}
+  #wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:12px 22px;min-width:0}
+  #ruler{position:relative;width:100%}
   #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:#fff}
   .msg{text-align:center;color:var(--muted);font:400 13px 'Segoe UI';max-width:320px;line-height:1.55}
   .msg b{color:var(--ink);display:block;margin-bottom:6px;font:600 14px 'Segoe UI'}
@@ -31,6 +31,7 @@
   .ptr .pl{width:3px;border-radius:2px}
   .ttl{position:absolute;top:0;left:0;font:700 10.5px 'Segoe UI';letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .ttl .tdot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:7px;vertical-align:middle}
+  .sub2{position:absolute;left:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;font:500 9.5px 'Segoe UI',Tahoma,sans-serif;letter-spacing:.02em}
   .delta{position:absolute;right:0;font:700 11.5px 'Consolas',monospace;padding:2px 9px;border-radius:999px}
 
   body.dialog{display:block}
@@ -92,6 +93,10 @@
           <label class="row">Diverging fill <span class="sw"><input type="checkbox" id="rFill"><i></i></span></label>
           <div class="row col"><span>Glow <span class="muted" id="rGlowV"></span></span><input type="range" id="rGlow" min="0" max="24" step="1"></div>
         </div>
+        <div class="grp"><h4>Size</h4>
+          <div class="row col"><span>Overall size <span class="muted" id="rScaleV"></span></span><input type="range" id="rScale" min="0.7" max="3" step="0.1"></div>
+          <div class="row"><span class="muted">Grows fonts, marker and bar together — turn up until it fills the object.</span></div>
+        </div>
       </div>
 
       <div class="tab" id="t-scale"><div class="grp"><h4>Scale</h4>
@@ -113,6 +118,8 @@
       <div class="tab" id="t-labels"><div class="grp"><h4>Labels</h4>
         <label class="row">Title <input type="text" id="rTitle" style="max-width:120px" placeholder="(field name)"></label>
         <label class="row">Show title <span class="sw"><input type="checkbox" id="rShowTitle"><i></i></span></label>
+        <label class="row">Subtitle <input type="text" id="rSubtitle" style="max-width:120px" placeholder="e.g. vs team avg"></label>
+        <label class="row">Show subtitle <span class="sw"><input type="checkbox" id="rShowSub"><i></i></span></label>
         <label class="row">Centre label <input type="text" id="rCentreLabel" style="max-width:90px" placeholder="avg"></label>
         <label class="row">Unit suffix <input type="text" id="rUnit" style="max-width:70px" placeholder="%"></label>
         <label class="row">Decimals <select id="rDecimals"><option value="tableau">Use Tableau</option><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
@@ -131,11 +138,11 @@
   const DIALOG = new URLSearchParams(location.search).get('dialog')==='1';
   let worksheet=null, last=null;
 
-  const TOGGLES=[['rFill','fill'],['rShowCentre','showCentre'],['rShowValue','showValue'],['rShowDelta','showDelta'],['rShowTitle','showTitle']];
-  const RANGES =[['rStrip','stripH','px'],['rTickH','tickH','px'],['rRelPct','relPct','%'],['rGlow','glow','px']];
+  const TOGGLES=[['rFill','fill'],['rShowCentre','showCentre'],['rShowValue','showValue'],['rShowDelta','showDelta'],['rShowTitle','showTitle'],['rShowSub','showSub']];
+  const RANGES =[['rStrip','stripH','px'],['rTickH','tickH','px'],['rRelPct','relPct','%'],['rGlow','glow','px'],['rScale','scale','×']];
   const COLORS =[['rTrack','trackColor'],['rCentre','centreColor'],['rGood','goodColor'],['rBad','badColor'],['rNum','numColor'],['rLabelColor','labelColor']];
   const SELECTS=[['rDotStyle','dotStyle'],['rScaleMode','scaleMode'],['rGoodDir','goodDir'],['rDecimals','decimals']];
-  const TEXTS  =[['rCentreLabel','centreLabel'],['rUnit','unit'],['rTitle','title']];
+  const TEXTS  =[['rCentreLabel','centreLabel'],['rUnit','unit'],['rTitle','title'],['rSubtitle','subtitle']];
 
   const PRESETS = {
     Neon:   {sw:'#10b466',o:{trackColor:'#edeae2',centreColor:'#16233f',goodColor:'#10b466',badColor:'#f5414f',numColor:'#16233f',labelColor:'#9298a3',stripH:8,tickH:26,fill:true,dotStyle:'tri',glow:12}},
@@ -150,7 +157,7 @@
     trackColor:'#edeae2', centreColor:'#16233f', goodColor:'#10b466', badColor:'#f5414f', numColor:'#16233f', labelColor:'#9298a3',
     stripH:8, tickH:26, dotStyle:'tri', fill:true, glow:12,
     centreLabel:'avg', unit:'', decimals:'tableau', showCentre:true, showValue:true, showDelta:true,
-    title:'', showTitle:true,
+    title:'', showTitle:true, subtitle:'', showSub:true, scale:1,
     fontFamily:"'Segoe UI', Tahoma, sans-serif"
   };
   let cfg = JSON.parse(JSON.stringify(DEFAULTS));
@@ -231,38 +238,48 @@
     const col = good==='up'?cfg.goodColor : good==='down'?cfg.badColor : cfg.centreColor;
     const fillL = pos>=50 ? 50 : pos, fillW = Math.abs(pos-50);
     const u=esc(cfg.unit);
-    const tickH=+cfg.tickH, stripH=+cfg.stripH, isLine=cfg.dotStyle==='line';
-    const g=+cfg.glow||0, glowCol=rgba(col,.55);
-    const fillGlow = g>0 ? `;box-shadow:0 0 ${g}px ${glowCol}` : '';
-    const markGlow = g>0 ? `;filter:drop-shadow(0 0 ${Math.max(1,Math.round(g*0.55))}px ${glowCol})` : '';
+    const isLine=cfg.dotStyle==='line';
+    const S = Math.max(.4, +cfg.scale||1);                       // overall size multiplier — grows everything
+    const tickH=(+cfg.tickH)*S, stripH=(+cfg.stripH)*S;
+    const vF=Math.round(14*S), tF=Math.round(10.5*S), sF=Math.round(9.5*S), aF=Math.round(10*S), dF=Math.round(11.5*S);
+    const triW=Math.round(7*S), triH=Math.round(9*S), tickMark=Math.round(10*S);
+    const g=+cfg.glow||0, gPx=g*S, glowCol=rgba(col,.55);
+    const fillGlow = g>0 ? `;box-shadow:0 0 ${gPx}px ${glowCol}` : '';
+    const markGlow = g>0 ? `;filter:drop-shadow(0 0 ${Math.max(1,Math.round(gPx*0.55))}px ${glowCol})` : '';
 
-    // vertical zones, top -> bottom: title · value+marker (ABOVE track) · track · avg + delta (BELOW track)
+    // vertical zones, top -> bottom: title · subtitle · value+marker (ABOVE) · track · avg + delta (BELOW)
     const rawTitle = (cfg.title && cfg.title.trim()) ? cfg.title.trim() : (titleText ? clean(titleText) : '');
     const showTitle = cfg.showTitle!==false && !!rawTitle;
-    const titleH = showTitle ? 22 : 6;
-    const valH   = cfg.showValue ? 18 : 0;
-    const markerAbove = isLine ? tickH/2 : 9;                 // marker's reach above the track centre
-    const midY   = titleH + valH + 5 + markerAbove + stripH/2;   // track vertical centre
-    const belowY = midY + Math.max(tickH, stripH)/2 + 7;        // avg label + delta baseline
-    const H      = belowY + 17;
+    const subTxt = (cfg.subtitle||'').trim();
+    const showSub = cfg.showSub!==false && !!subTxt;
+    const titleLineH = showTitle ? Math.round(tF*1.7) : 0;
+    const subLineH   = showSub   ? Math.round(sF*1.7) : 0;
+    const headH = (titleLineH + subLineH) || Math.round(6*S);
+    const valH  = cfg.showValue ? Math.round(vF*1.25) : 0;
+    const markerAbove = isLine ? tickH/2 : triH;                 // marker's reach above the track centre
+    const midY   = headH + valH + Math.round(5*S) + markerAbove + stripH/2;   // track vertical centre
+    const belowY = midY + Math.max(tickH, stripH)/2 + Math.round(7*S);        // avg label + delta baseline
+    const H      = belowY + Math.round(aF*1.9);
 
-    let ticks=''; for(let t=10;t<=90;t+=10){ if(t!==50) ticks+=`<span class="tick" style="left:${t}%;top:${midY-5}px;height:10px"></span>`; }
-    const fillS = cfg.fill ? `<div class="fill" style="left:${fillL}%;width:${fillW}%;top:${midY-(stripH/2)+1}px;height:${stripH-2}px;background:${col}${fillGlow}"></div>` : '';
+    let ticks=''; for(let t=10;t<=90;t+=10){ if(t!==50) ticks+=`<span class="tick" style="left:${t}%;top:${midY-tickMark/2}px;height:${tickMark}px"></span>`; }
+    const fillS = cfg.fill ? `<div class="fill" style="left:${fillL}%;width:${fillW}%;top:${midY-(stripH/2)+1}px;height:${Math.max(2,stripH-2)}px;background:${col}${fillGlow}"></div>` : '';
 
     const markerEl = isLine ? `<span class="pl" style="height:${tickH}px;background:${col}${markGlow}"></span>`
-                            : `<span class="tri" style="border-top:9px solid ${col}${markGlow}"></span>`;
-    const valEl = cfg.showValue ? `<span class="pv" style="color:${col}">${esc(fmtN(value.raw,value.fmt))}${u}</span>` : '';
-    const ptrTop = isLine ? (midY - tickH/2 - valH - 2) : (midY - stripH/2 - 9 - valH - 2);
+                            : `<span class="tri" style="border-left:${triW}px solid transparent;border-right:${triW}px solid transparent;border-top:${triH}px solid ${col}${markGlow}"></span>`;
+    const valEl = cfg.showValue ? `<span class="pv" style="font-size:${vF}px;color:${col}">${esc(fmtN(value.raw,value.fmt))}${u}</span>` : '';
+    const ptrTop = isLine ? (midY - tickH/2 - valH - 2) : (midY - stripH/2 - triH - valH - 2);
 
-    const centreTick = `<div class="center" style="top:${midY-tickH/2}px;width:2px;height:${tickH}px;background:${cfg.centreColor};border-radius:2px"></div>`;
-    const centreVal = cfg.showCentre ? `<div class="cl" style="top:${belowY}px;color:${cfg.labelColor}">${esc(cfg.centreLabel)} <b style="color:${cfg.numColor}">${esc(fmtN(centre.raw,centre.fmt))}${u}</b></div>` : '';
+    const centreTick = `<div class="center" style="top:${midY-tickH/2}px;width:${Math.max(2,Math.round(2*S))}px;height:${tickH}px;background:${cfg.centreColor};border-radius:2px"></div>`;
+    const centreVal = cfg.showCentre ? `<div class="cl" style="top:${belowY}px;font-size:${aF}px;color:${cfg.labelColor}">${esc(cfg.centreLabel)} <b style="color:${cfg.numColor}">${esc(fmtN(centre.raw,centre.fmt))}${u}</b></div>` : '';
     const ds = dev>0?'+':(dev<0?'−':'±');
-    const deltaChip = cfg.showDelta ? `<div class="delta" style="top:${belowY-2}px;color:${col};background:${rgba(col,.12)};box-shadow:0 2px 7px ${rgba(col,.20)}">${ds}${fmtDelta(dev)}${u}</div>` : '';
-    const titleDot = `<span class="tdot" style="background:${col}${g>0?`;box-shadow:0 0 ${Math.max(3,Math.round(g*0.5))}px ${glowCol}`:''}"></span>`;
-    const titleEl = showTitle ? `<div class="ttl" style="color:${cfg.numColor}">${titleDot}${esc(rawTitle)}</div>` : '';
+    const deltaChip = cfg.showDelta ? `<div class="delta" style="top:${belowY-2}px;font-size:${dF}px;color:${col};background:${rgba(col,.12)};box-shadow:0 2px 7px ${rgba(col,.20)}">${ds}${fmtDelta(dev)}${u}</div>` : '';
+    const dotSize = Math.round(6*S);
+    const titleDot = `<span class="tdot" style="width:${dotSize}px;height:${dotSize}px;background:${col}${g>0?`;box-shadow:0 0 ${Math.max(3,Math.round(gPx*0.5))}px ${glowCol}`:''}"></span>`;
+    const titleEl = showTitle ? `<div class="ttl" style="top:0;font-size:${tF}px;color:${cfg.numColor}">${titleDot}${esc(rawTitle)}</div>` : '';
+    const subEl   = showSub   ? `<div class="sub2" style="top:${titleLineH}px;font-size:${sF}px;color:${cfg.labelColor}">${esc(subTxt)}</div>` : '';
 
     $('ruler').innerHTML = `<div style="position:relative;height:${H}px;font-family:${cfg.fontFamily}">
-      ${titleEl}
+      ${titleEl}${subEl}
       <div class="track" style="top:${midY-stripH/2}px;height:${stripH}px;background:${cfg.trackColor};box-shadow:inset 0 1px 2px rgba(0,0,0,.05)"></div>
       ${ticks}${fillS}
       ${centreTick}
