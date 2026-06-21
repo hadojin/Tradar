@@ -28,7 +28,8 @@
   #panel.open{transform:none}
   .phead{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line)}
   .phead h3{font:700 13px 'Segoe UI'}
-  .phead .x{cursor:pointer;color:#999;font-size:18px;border:0;background:none}
+  .phead .x{cursor:pointer;color:#999;font-size:20px;line-height:1;border:0;background:none;padding:4px 8px;margin:-4px -6px -4px 0;border-radius:6px}
+  .phead .x:hover{color:#333;background:#f0f0f0}
   .pbody{overflow-y:auto;padding:4px 14px 18px}
   .grp{margin-top:13px}
   .grp h4{font:700 9.5px 'Segoe UI';letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;padding-bottom:4px;border-bottom:1px dashed var(--line)}
@@ -130,8 +131,11 @@
     clearTimeout(saveT); saveT=setTimeout(()=>{ try{ tableau.extensions.settings.saveAsync(); }catch(_){} }, 300); }catch(_){} }
 
   /* ---------- boot ---------- */
-  $('gear').onclick=()=>$('panel').classList.add('open');
-  $('pClose').onclick=()=>$('panel').classList.remove('open');
+  const closePanel=()=>$('panel').classList.remove('open');
+  $('gear').onclick=()=>$('panel').classList.toggle('open');     // gear toggles
+  $('pClose').onclick=closePanel;                                 // the × closes
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePanel(); });   // Esc closes
+  $('scroll').addEventListener('mousedown',closePanel);           // clicking the calendar closes
   bindControls();
   tableau.extensions.initializeAsync().then(() => {
     worksheet = tableau.extensions.worksheetContent.worksheet;

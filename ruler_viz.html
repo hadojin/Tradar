@@ -26,10 +26,11 @@
   .cl b{font-family:'Consolas',monospace}
   .fill{position:absolute;border-radius:5px;transition:all .45s cubic-bezier(.3,.7,.2,1)}
   .ptr{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;transition:left .45s cubic-bezier(.3,.7,.2,1)}
-  .ptr .pv{font:700 13px 'Consolas',monospace;margin-bottom:3px;white-space:nowrap}
-  .ptr .tri{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent}
+  .ptr .pv{font:700 14px 'Consolas',monospace;margin-bottom:4px;white-space:nowrap;letter-spacing:.01em}
+  .ptr .tri{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;filter:drop-shadow(0 1px 1px rgba(0,0,0,.12))}
   .ptr .pl{width:3px;border-radius:2px}
-  .delta{position:absolute;right:0;top:0;font:600 12px 'Consolas',monospace;padding:2px 8px;border-radius:999px}
+  .ttl{position:absolute;top:0;left:0;font:700 10px 'Segoe UI';letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .delta{position:absolute;right:0;font:700 11.5px 'Consolas',monospace;padding:2px 9px;border-radius:999px}
 
   body.dialog{display:block}
   body.dialog #stage{display:none}
@@ -108,6 +109,8 @@
       </div></div>
 
       <div class="tab" id="t-labels"><div class="grp"><h4>Labels</h4>
+        <label class="row">Title <input type="text" id="rTitle" style="max-width:120px" placeholder="(field name)"></label>
+        <label class="row">Show title <span class="sw"><input type="checkbox" id="rShowTitle"><i></i></span></label>
         <label class="row">Centre label <input type="text" id="rCentreLabel" style="max-width:90px" placeholder="avg"></label>
         <label class="row">Unit suffix <input type="text" id="rUnit" style="max-width:70px" placeholder="%"></label>
         <label class="row">Decimals <select id="rDecimals"><option value="tableau">Use Tableau</option><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
@@ -126,11 +129,11 @@
   const DIALOG = new URLSearchParams(location.search).get('dialog')==='1';
   let worksheet=null, last=null;
 
-  const TOGGLES=[['rFill','fill'],['rShowCentre','showCentre'],['rShowValue','showValue'],['rShowDelta','showDelta']];
+  const TOGGLES=[['rFill','fill'],['rShowCentre','showCentre'],['rShowValue','showValue'],['rShowDelta','showDelta'],['rShowTitle','showTitle']];
   const RANGES =[['rStrip','stripH','px'],['rTickH','tickH','px'],['rRelPct','relPct','%']];
   const COLORS =[['rTrack','trackColor'],['rCentre','centreColor'],['rGood','goodColor'],['rBad','badColor'],['rNum','numColor'],['rLabelColor','labelColor']];
   const SELECTS=[['rDotStyle','dotStyle'],['rScaleMode','scaleMode'],['rGoodDir','goodDir'],['rDecimals','decimals']];
-  const TEXTS  =[['rCentreLabel','centreLabel'],['rUnit','unit']];
+  const TEXTS  =[['rCentreLabel','centreLabel'],['rUnit','unit'],['rTitle','title']];
 
   const PRESETS = {
     Clean:  {sw:'#16294f',o:{trackColor:'#e8e3d7',centreColor:'#16294f',goodColor:'#2E7D52',badColor:'#C2410C',numColor:'#16294f',labelColor:'#8a95a0',stripH:7,tickH:24,fill:true,dotStyle:'tri'}},
@@ -144,6 +147,7 @@
     trackColor:'#e8e3d7', centreColor:'#16294f', goodColor:'#2E7D52', badColor:'#C2410C', numColor:'#16294f', labelColor:'#8a95a0',
     stripH:7, tickH:24, dotStyle:'tri', fill:true,
     centreLabel:'avg', unit:'', decimals:'tableau', showCentre:true, showValue:true, showDelta:true,
+    title:'', showTitle:true,
     fontFamily:"'Segoe UI', Tahoma, sans-serif"
   };
   let cfg = JSON.parse(JSON.stringify(DEFAULTS));
@@ -201,7 +205,7 @@
         const raw=(typeof nv==='number')?nv:(typeof v==='number'?v:parseFloat(cell.formattedValue)); return {raw, fmt:cell.formattedValue}; };
       const value=get('value'), centre=get('centre');
       if(!value || !centre) return showMsg('Assign two measures','Put your figure on <span class="enc">Value</span> and the average on <span class="enc">Centre</span>.');
-      draw(value, centre);
+      draw(value, centre, fieldBy['value']);
     }catch(e){ showMsg('Error', esc(String(e&&e.message||e))); }
   }
   async function fetchTable(ws){
@@ -211,40 +215,56 @@
 
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   function fmtN(raw,fmt){ if(cfg.decimals==='tableau') return fmt; let s=(+raw).toFixed(+cfg.decimals||0); return s; }
+  function clean(s){ return String(s).replace(/^[A-Za-z]+\((.*)\)$/,'$1').replace(/_/g,' ').replace(/\s+/g,' ').trim().replace(/\b\w/g,c=>c.toUpperCase()); }
+  function fmtDelta(dev){ const a=Math.abs(dev); let dec; if(cfg.decimals==='tableau'){ dec=(a%1===0)?0:1; } else dec=+cfg.decimals||0; return a.toFixed(dec); }
 
-  function draw(value, centre){
-    last={value,centre};
+  function draw(value, centre, titleText){
+    last={value,centre,titleText};
     const dev = value.raw - centre.raw;
     const fullDev = cfg.scaleMode==='fixed' ? Math.max(Math.abs(+cfg.range)||1,1e-6) : Math.max(Math.abs(centre.raw)*(+cfg.relPct/100),1e-6);
-    const pos = clamp(50 + (dev/fullDev)*50, 4, 96);
+    const pos = clamp(50 + (dev/fullDev)*50, 5, 95);
     const good = Math.abs(dev)<1e-9 ? 'flat' : (((dev>0)===(cfg.goodDir==='up')) ? 'up':'down');
     const col = good==='up'?cfg.goodColor : good==='down'?cfg.badColor : cfg.centreColor;
     const fillL = pos>=50 ? 50 : pos, fillW = Math.abs(pos-50);
     const u=esc(cfg.unit);
-    const H = 70;                              // ruler box height
-    const midY = 32;                           // track vertical centre
-    const fillS = cfg.fill ? `<div class="fill" style="left:${fillL}%;width:${fillW}%;top:${midY-(cfg.stripH/2)+1}px;height:${cfg.stripH-2}px;background:${col}"></div>` : '';
+    const tickH=+cfg.tickH, stripH=+cfg.stripH, isLine=cfg.dotStyle==='line';
+
+    // vertical zones, top -> bottom: title · value+marker (ABOVE track) · track · avg + delta (BELOW track)
+    const rawTitle = (cfg.title && cfg.title.trim()) ? cfg.title.trim() : (titleText ? clean(titleText) : '');
+    const showTitle = cfg.showTitle!==false && !!rawTitle;
+    const titleH = showTitle ? 22 : 6;
+    const valH   = cfg.showValue ? 18 : 0;
+    const markerAbove = isLine ? tickH/2 : 9;                 // marker's reach above the track centre
+    const midY   = titleH + valH + 5 + markerAbove + stripH/2;   // track vertical centre
+    const belowY = midY + Math.max(tickH, stripH)/2 + 7;        // avg label + delta baseline
+    const H      = belowY + 17;
+
     let ticks=''; for(let t=10;t<=90;t+=10){ if(t!==50) ticks+=`<span class="tick" style="left:${t}%;top:${midY-5}px;height:10px"></span>`; }
-    const marker = cfg.dotStyle==='line'
-      ? `<span class="pl" style="height:${cfg.tickH}px;background:${col}"></span>`
-      : `<span class="tri" style="border-top:8px solid ${col}"></span>`;
-    const yourVal = cfg.showValue ? `<span class="pv" style="color:${col}">${esc(fmtN(value.raw,value.fmt))}${u}</span>` : '';
-    const centreVal = cfg.showCentre ? `<div class="cl" style="top:${midY+cfg.tickH/2+1}px;color:${cfg.labelColor}">${esc(cfg.centreLabel)} <b style="color:${cfg.numColor}">${esc(fmtN(centre.raw,centre.fmt))}${u}</b></div>` : '';
-    const sign = dev>0?'+':'';
-    const deltaChip = cfg.showDelta ? `<div class="delta" style="color:${col};background:${good==='up'?'#e7f1ec':good==='down'?'#f9e9e0':'#f0ece2'}">${sign}${esc(fmtN(dev, sign+Math.abs(Math.round(dev*100)/100)))}${u}</div>` : '';
+    const fillS = cfg.fill ? `<div class="fill" style="left:${fillL}%;width:${fillW}%;top:${midY-(stripH/2)+1}px;height:${stripH-2}px;background:${col}"></div>` : '';
+
+    const markerEl = isLine ? `<span class="pl" style="height:${tickH}px;background:${col}"></span>`
+                            : `<span class="tri" style="border-top:9px solid ${col}"></span>`;
+    const valEl = cfg.showValue ? `<span class="pv" style="color:${col}">${esc(fmtN(value.raw,value.fmt))}${u}</span>` : '';
+    const ptrTop = isLine ? (midY - tickH/2 - valH - 2) : (midY - stripH/2 - 9 - valH - 2);
+
+    const centreTick = `<div class="center" style="top:${midY-tickH/2}px;width:2px;height:${tickH}px;background:${cfg.centreColor}"></div>`;
+    const centreVal = cfg.showCentre ? `<div class="cl" style="top:${belowY}px;color:${cfg.labelColor}">${esc(cfg.centreLabel)} <b style="color:${cfg.numColor}">${esc(fmtN(centre.raw,centre.fmt))}${u}</b></div>` : '';
+    const ds = dev>0?'+':(dev<0?'−':'±');
+    const deltaChip = cfg.showDelta ? `<div class="delta" style="top:${belowY-2}px;color:${col};background:${good==='up'?'#e7f1ec':good==='down'?'#f9e9e0':'#f0ece2'}">${ds}${fmtDelta(dev)}${u}</div>` : '';
+    const titleEl = showTitle ? `<div class="ttl" style="color:${cfg.numColor};opacity:.85">${esc(rawTitle)}</div>` : '';
 
     $('ruler').innerHTML = `<div style="position:relative;height:${H}px;font-family:${cfg.fontFamily}">
-      ${deltaChip}
-      <div class="track" style="top:${midY-cfg.stripH/2}px;height:${cfg.stripH}px;background:${cfg.trackColor}"></div>
-      ${ticks}
-      ${fillS}
-      <div class="center" style="top:${midY-cfg.tickH/2}px;width:2px;height:${cfg.tickH}px;background:${cfg.centreColor}"></div>
+      ${titleEl}
+      <div class="track" style="top:${midY-stripH/2}px;height:${stripH}px;background:${cfg.trackColor}"></div>
+      ${ticks}${fillS}
+      ${centreTick}
       ${centreVal}
-      <div class="ptr" style="left:${pos}%;top:${midY-cfg.tickH/2-20}px">${yourVal}${marker}</div>
+      <div class="ptr" style="left:${pos}%;top:${ptrTop}px">${valEl}${markerEl}</div>
+      ${deltaChip}
     </div>`;
     $('ruler').classList.remove('hide'); $('msg').classList.add('hide');
   }
-  function redraw(){ if(last) draw(last.value,last.centre); }
+  function redraw(){ if(last) draw(last.value,last.centre,last.titleText); }
 
   function buildStyles(){
     const box=$('styles'); box.innerHTML='';
